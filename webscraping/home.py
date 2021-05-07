@@ -1,6 +1,6 @@
 class Home:
     # Attributes
-    price = district = rooms = baths = size = floor = url = type = parking = url = None
+    price = district = rooms = baths = size = floor = url = type = parking = None
 
     # Constructor
     def __init__(self, url, district):
