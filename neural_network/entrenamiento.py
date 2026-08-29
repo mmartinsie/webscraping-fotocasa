@@ -9,7 +9,7 @@ import numpy as np
 def mse(Ypredich, Yreal):
     """Return ``(mean_squared_error, residual)`` for a batch of predictions."""
     residual = np.array(Ypredich) - np.array(Yreal)
-    return np.mean(residual ** 2), residual
+    return np.mean(residual**2), residual
 
 
 def entrenamiento(X, Y, red_neuronal, lr=0.05):
@@ -38,11 +38,7 @@ def entrenamiento(X, Y, red_neuronal, lr=0.05):
         w_next = red_neuronal[layer_idx].W.transpose()
 
         # Gradient descent update.
-        red_neuronal[layer_idx].b = (
-            red_neuronal[layer_idx].b - np.mean(delta[-1], axis=0, keepdims=True) * lr
-        )
-        red_neuronal[layer_idx].W = (
-            red_neuronal[layer_idx].W - output[layer_idx].transpose() @ delta[-1] * lr
-        )
+        red_neuronal[layer_idx].b = red_neuronal[layer_idx].b - np.mean(delta[-1], axis=0, keepdims=True) * lr
+        red_neuronal[layer_idx].W = red_neuronal[layer_idx].W - output[layer_idx].transpose() @ delta[-1] * lr
 
     return output[-1]

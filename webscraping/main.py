@@ -1,10 +1,11 @@
 """Scrape Madrid property listings from Fotocasa into a CSV file.
 
 Drives Firefox with Selenium to walk the search-results pages, then downloads and
-parses each listing with :mod:`listing`. Run it from inside the ``webscraping``
-directory:
+parses each listing with :mod:`listing`. Rows are written to the output CSV as
+they are scraped, so an interrupted run can be continued with ``--resume``.
 
     python main.py --pages 5 --output buildings_information.csv
+    python main.py --pages 5 --output buildings_information.csv --resume
 
 A geckodriver binary is required (https://github.com/mozilla/geckodriver); pass
 its path with ``--geckodriver`` or the ``GECKODRIVER_PATH`` environment variable.
@@ -16,18 +17,22 @@ written and will need revisiting if the site layout has changed.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
 import logging
 import os
 import time
+from collections.abc import Iterator
 
 import requests
+from requests.adapters import HTTPAdapter
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from urllib3.util.retry import Retry
 
 from home import CSV_HEADERS, Home
 from listing import scrape_listing
@@ -52,6 +57,30 @@ DEFAULT_USER_AGENT = (
 )
 SCROLL_PAUSE_TIME = 0.5
 PAGE_LOAD_PAUSE = 5
+
+# Madrid districts whose names are more than one word; the card label ends with
+# the last N words instead of just the last one.
+MULTIWORD_DISTRICTS = {
+    "Vallecas": 3,  # "Puente de Vallecas" / "Villa de Vallecas"
+    "Lineal": 2,  # "Ciudad Lineal"
+    "Blas": 2,  # "San Blas"
+}
+
+
+def build_session(user_agent: str = DEFAULT_USER_AGENT) -> requests.Session:
+    """Return a :class:`requests.Session` with a UA header and retry/backoff."""
+    session = requests.Session()
+    session.headers["User-Agent"] = user_agent
+    retry = Retry(
+        total=3,
+        backoff_factor=1.0,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=("GET",),
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
 
 
 def build_driver(geckodriver_path: str | None, headless: bool) -> webdriver.Firefox:
@@ -94,35 +123,40 @@ def listing_links(driver: webdriver.Firefox) -> list[str]:
     return [href for card in cards if (href := card.get_attribute("href"))]
 
 
-def district_for(driver: webdriver.Firefox, index: int) -> str | None:
-    """Read the district shown on the ``index``-th card (1-based).
+def district_from_label(text: str, prefix: str = "") -> str | None:
+    """Extract the district from a card's location label.
 
-    The label text is ``<neighbourhood>, ... <district>``; we take the trailing
-    token, with special cases for the multi-word Madrid districts whose names do
-    not fit that rule.
+    The label reads ``<neighbourhood>, ... <district>``; the district is the last
+    token, except for the multi-word names in :data:`MULTIWORD_DISTRICTS`.
     """
+    tokens = text[len(prefix) :].split()
+    if not tokens:
+        return None
+    last = tokens[-1]
+    words = MULTIWORD_DISTRICTS.get(last, 1)
+    return " ".join(tokens[-words:])
+
+
+def district_for(driver: webdriver.Firefox, index: int) -> str | None:
+    """Read the district shown on the ``index``-th card (1-based)."""
     try:
-        label = driver.find_element(
-            By.XPATH, DISTRICT_XPATH_TEMPLATE.format(index=index)
-        )
+        label = driver.find_element(By.XPATH, DISTRICT_XPATH_TEMPLATE.format(index=index))
     except NoSuchElementException:
         return None
 
     prefix = ""
-    try:
+    with contextlib.suppress(NoSuchElementException):
         prefix = label.find_element(By.TAG_NAME, "span").text
-    except NoSuchElementException:
-        pass
 
-    tokens = label.text[len(prefix):].split()
-    if not tokens:
-        return None
-    district = tokens[-1]
-    if district == "Vallecas":
-        district = " ".join(tokens[-3:])
-    elif district in ("Lineal", "Blas"):
-        district = " ".join(tokens[-2:])
-    return district
+    return district_from_label(label.text, prefix)
+
+
+def load_scraped_urls(path: str) -> set[str]:
+    """Return the set of listing URLs already present in ``path`` (empty if none)."""
+    if not os.path.exists(path):
+        return set()
+    with open(path, newline="", encoding="utf-8") as handle:
+        return {row["URL"] for row in csv.DictReader(handle) if row.get("URL")}
 
 
 def scrape_search(
@@ -131,9 +165,9 @@ def scrape_search(
     pages: int,
     start_page: int,
     delay: float,
-) -> list[Home]:
-    """Walk ``pages`` search-result pages and return the parsed listings."""
-    homes: list[Home] = []
+    skip_urls: set[str],
+) -> Iterator[Home]:
+    """Yield the parsed listing for every card across ``pages`` results pages."""
     for page in range(start_page, start_page + pages):
         logger.info("Search page %d", page)
         driver.get(SEARCH_URL_TEMPLATE.format(page=page))
@@ -144,6 +178,9 @@ def scrape_search(
         links = listing_links(driver)
         logger.info("  %d listings", len(links))
         for index, link in enumerate(links, start=1):
+            if link in skip_urls:
+                logger.debug("  already scraped, skipping %s", link)
+                continue
             district = district_for(driver, index)
             if district is None:
                 logger.debug("  no district for card %d, skipping", index)
@@ -151,18 +188,7 @@ def scrape_search(
             time.sleep(delay)
             home = scrape_listing(session, link, district)
             if home is not None:
-                homes.append(home)
-    return homes
-
-
-def write_csv(homes: list[Home], path: str) -> None:
-    """Write ``homes`` to ``path`` as CSV (overwriting any existing file)."""
-    with open(path, "w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=CSV_HEADERS)
-        writer.writeheader()
-        for home in homes:
-            writer.writerow(home.to_csv_row())
-    logger.info("Wrote %d rows to %s", len(homes), path)
+                yield home
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -174,33 +200,44 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=os.environ.get("GECKODRIVER_PATH"),
         help="path to the geckodriver binary (default: $GECKODRIVER_PATH or PATH)",
     )
+    parser.add_argument("--output", default="buildings_information.csv", help="output CSV path")
     parser.add_argument(
-        "--output", default="buildings_information.csv", help="output CSV path"
+        "--resume",
+        action="store_true",
+        help="append to --output and skip listing URLs it already contains",
     )
     parser.add_argument("--headless", action="store_true", help="run Firefox headless")
-    parser.add_argument(
-        "--delay", type=float, default=5.0, help="seconds to wait between listing requests"
-    )
+    parser.add_argument("--delay", type=float, default=5.0, help="seconds to wait between listing requests")
     parser.add_argument("--log-level", default="INFO", help="logging level (default: INFO)")
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    logging.basicConfig(
-        level=args.log_level.upper(), format="%(asctime)s %(levelname)s %(message)s"
-    )
+    logging.basicConfig(level=args.log_level.upper(), format="%(asctime)s %(levelname)s %(message)s")
 
-    session = requests.Session()
-    session.headers["User-Agent"] = DEFAULT_USER_AGENT
+    skip_urls = load_scraped_urls(args.output) if args.resume else set()
+    if skip_urls:
+        logger.info("Resuming: %d listings already in %s", len(skip_urls), args.output)
 
+    session = build_session()
     driver = build_driver(args.geckodriver, args.headless)
+
+    mode = "a" if (args.resume and skip_urls) else "w"
+    written = 0
     try:
-        homes = scrape_search(driver, session, args.pages, args.start_page, args.delay)
+        with open(args.output, mode, newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=CSV_HEADERS)
+            if mode == "w":
+                writer.writeheader()
+            for home in scrape_search(driver, session, args.pages, args.start_page, args.delay, skip_urls):
+                writer.writerow(home.to_csv_row())
+                handle.flush()
+                written += 1
     finally:
         driver.quit()
 
-    write_csv(homes, args.output)
+    logger.info("Wrote %d new rows to %s", written, args.output)
     return 0
 
 

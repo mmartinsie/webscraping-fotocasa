@@ -19,6 +19,13 @@ env/
 .vscode/
 .DS_Store
 Thumbs.db
+.pytest_cache/
+.ruff_cache/
+
+# Saved model bundles (recommend_price.py --save)
+*.keras
+model_dir/
+tmp_model/
 
 # Scratch run logs
 run*.out

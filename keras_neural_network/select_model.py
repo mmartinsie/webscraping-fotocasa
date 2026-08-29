@@ -11,30 +11,23 @@ from __future__ import annotations
 
 import argparse
 
+import keras
 import numpy as np
-import pandas as pd
+from keras.layers import Dense, Input
+from keras.models import Sequential
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import KFold
 
-import keras
-from keras.layers import Dense, Input
-from keras.models import Sequential
+from dataset import FEATURES, LEAKY_FEATURE, load_xy
 
 RANDOM_SEED = 42
-N_FEATURES = 6
-DROP_COLUMNS = ["Tipo", "Distrito"]
-
-
-def load_xy(dataset: str) -> tuple[np.ndarray, np.ndarray]:
-    raw = pd.read_csv(dataset, header=0, encoding="latin1")
-    data = raw.fillna(value=1).drop(DROP_COLUMNS, axis=1).to_numpy()
-    return data[:, 2:8].astype("float32"), data[:, 1].astype("float32")
+MODEL_FEATURES = [LEAKY_FEATURE, *FEATURES]
 
 
 def create_model(optimizer: str) -> Sequential:
     model = Sequential(
         [
-            Input(shape=(N_FEATURES,)),
+            Input(shape=(len(MODEL_FEATURES),)),
             Dense(6, activation="relu"),
             Dense(6, activation="relu"),
             Dense(1, activation="relu"),
@@ -57,9 +50,7 @@ def cross_val_mse(
     scores = []
     for train_idx, val_idx in kfold.split(X):
         model = create_model(optimizer)
-        model.fit(
-            X[train_idx], y[train_idx], epochs=epochs, batch_size=batch_size, verbose=0
-        )
+        model.fit(X[train_idx], y[train_idx], epochs=epochs, batch_size=batch_size, verbose=0)
         pred = model.predict(X[val_idx], verbose=0).ravel()
         scores.append(mean_squared_error(y[val_idx], pred))
     return np.array(scores)
@@ -71,9 +62,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=10)
     parser.add_argument("--folds", type=int, default=3)
-    parser.add_argument(
-        "--optimizers", nargs="+", default=["SGD", "RMSprop", "Adam"]
-    )
+    parser.add_argument("--optimizers", nargs="+", default=["SGD", "RMSprop", "Adam"])
     return parser.parse_args(argv)
 
 
@@ -82,13 +71,11 @@ def main(argv: list[str] | None = None) -> int:
     np.random.seed(RANDOM_SEED)
     keras.utils.set_random_seed(RANDOM_SEED)
 
-    X, y = load_xy(args.dataset)
+    X, y = load_xy(args.dataset, MODEL_FEATURES)
 
     results = {}
     for optimizer in args.optimizers:
-        scores = cross_val_mse(
-            optimizer, X, y, args.folds, args.epochs, args.batch_size
-        )
+        scores = cross_val_mse(optimizer, X, y, args.folds, args.epochs, args.batch_size)
         results[optimizer] = scores
         print(f"{optimizer:<10} MSE {scores.mean():,.0f} (+/- {scores.std():,.0f})")
 

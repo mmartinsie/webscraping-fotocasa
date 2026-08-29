@@ -14,15 +14,18 @@ from __future__ import annotations
 
 import argparse
 
-import numpy as np
-import pandas as pd
 import keras
+import numpy as np
 from keras.layers import Dense, Input
 from keras.models import Sequential
 
+from dataset import FEATURES, LEAKY_FEATURE, load_xy
+
 RANDOM_SEED = 42
-N_FEATURES = 6
-DROP_COLUMNS = ["Tipo", "Distrito"]
+
+# The thesis model keeps Precio_m2 as an input (see recommend_price.py for why
+# that leaks the target).
+MODEL_FEATURES = [LEAKY_FEATURE, *FEATURES]
 
 OPTIMIZERS = {
     "sgd": keras.optimizers.SGD,
@@ -31,19 +34,10 @@ OPTIMIZERS = {
 }
 
 
-def load_xy(dataset: str) -> tuple[np.ndarray, np.ndarray]:
-    """Return ``(X, y)`` = (6 numeric predictors, ``Precio``)."""
-    raw = pd.read_csv(dataset, header=0, encoding="latin1")
-    data = raw.fillna(value=1).drop(DROP_COLUMNS, axis=1).to_numpy()
-    x = data[:, 2:8].astype("float32")
-    y = data[:, 1].astype("float32")
-    return x, y
-
-
 def build_model(optimizer: str, loss: str, learning_rate: float) -> Sequential:
     model = Sequential(
         [
-            Input(shape=(N_FEATURES,)),
+            Input(shape=(len(MODEL_FEATURES),)),
             Dense(6, activation="relu"),
             Dense(6, activation="relu"),
             Dense(6, activation="relu"),
@@ -77,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
     np.random.seed(RANDOM_SEED)
     keras.utils.set_random_seed(RANDOM_SEED)
 
-    X, y = load_xy(args.dataset)
+    X, y = load_xy(args.dataset, MODEL_FEATURES)
     model = build_model(args.optimizer, args.loss, args.learning_rate)
     history = model.fit(
         X,

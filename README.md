@@ -6,6 +6,22 @@ of two parts: on one side, the scraping of information from the Fotocasa website
 and, on the other side, the neural network that predicts the price of a property
 based on its characteristics.
 
+## Pipeline
+
+```
+fotocasa.es ──webscraping/main.py──▶ buildings_information.csv
+                                            │
+                                   prepare_dataset.py
+                                            ▼
+                                       dataset.csv ──▶ keras_neural_network/*.py
+```
+
+`prepare_dataset.py` (repo root) cleans the raw scraper CSV into the columns the
+model scripts consume — see [`keras_neural_network/DATA.md`](keras_neural_network/DATA.md).
+
+Linting (`ruff`), compilation and tests run in CI (`.github/workflows/ci.yml`);
+run them locally with `ruff check . && ruff format --check . && pytest`.
+
 ## Web scraping Fotocasa
 
 Contained in the `/webscraping` directory, it is made up of three scripts:
@@ -29,9 +45,9 @@ There are two neural-network implementations in this repository. The first one,
 in the `/neural_network` directory, is obsolete and unused — it was a first
 iteration written from scratch with NumPy. The second one, in the
 `/keras_neural_network` directory, is the final implementation using the Python
-library *Keras*. That directory also includes `recommend_price.py`, which
-benchmarks several network configurations, reports the one that predicts price
-best and prints a recommended price for a flat.
+library *Keras*. That directory also includes `recommend_price.py` (benchmarks
+several network configs, recommends one, and can save it), `predict.py` (price a
+flat from a saved model) and `baseline.py` (non-neural reference numbers).
 
 See [`neural_network/README.md`](neural_network/README.md) and
 [`keras_neural_network/README.md`](keras_neural_network/README.md) for details.
@@ -54,3 +70,7 @@ The websites used during the development of the project:
 - [Ander Fernández — How to program a neural network from scratch in Python](https://anderfernandez.com/blog/como-programar-una-red-neuronal-desde-0-en-python/)
 - [W3Schools — Python classes](https://www.w3schools.com/python/python_classes.asp)
 - [Machine Learning Mastery — Your first neural network in Python with Keras](https://machinelearningmastery.com/tutorial-first-neural-network-python-keras/)
+
+## License
+
+[MIT](LICENSE).

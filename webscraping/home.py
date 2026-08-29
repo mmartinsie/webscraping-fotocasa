@@ -5,11 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 # CSV column order used by the scraper output. The names are Spanish on purpose:
-# they mirror the field labels shown on fotocasa.es.
+# they match the existing ``buildings_information.csv`` and what the model scripts
+# expect (they ``drop(["Tipo", "Distrito"])``).
 CSV_HEADERS = [
     "Precio",
     "Distrito",
-    "Tipo de inmueble",
+    "Tipo",
     "Habitaciones",
     "Aseos",
     "Superficie",
@@ -43,7 +44,7 @@ class Home:
         return {
             "Precio": self.price,
             "Distrito": self.district,
-            "Tipo de inmueble": self.property_type,
+            "Tipo": self.property_type,
             "Habitaciones": self.rooms,
             "Aseos": self.baths,
             "Superficie": self.size,

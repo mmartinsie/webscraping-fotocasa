@@ -12,7 +12,6 @@ import sys
 
 import numpy as np
 import pandas
-
 from capas import capa
 from entrenamiento import entrenamiento, mse
 from funcionRelu import relu

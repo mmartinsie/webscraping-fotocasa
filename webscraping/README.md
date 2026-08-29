@@ -39,13 +39,17 @@ Point the scraper at geckodriver with `--geckodriver PATH` or the
 | `--start-page` | `1` | first results page (1-based) |
 | `--geckodriver` | `$GECKODRIVER_PATH` | path to the geckodriver binary |
 | `--output` | `buildings_information.csv` | output CSV path |
+| `--resume` | off | append to `--output`, skipping listing URLs it already contains |
 | `--headless` | off | run Firefox without a window |
 | `--delay` | `5.0` | seconds between listing requests |
 | `--log-level` | `INFO` | logging verbosity |
 
-The output CSV is written with the columns `Precio`, `Distrito`,
-`Tipo de inmueble`, `Habitaciones`, `Aseos`, `Superficie`, `Planta`, `Parking`,
-`URL` (Spanish names, matching the Fotocasa fields).
+Rows are flushed to the CSV as they are scraped, so a crashed run can be picked
+up again with `--resume`.
+
+The output CSV is written with the columns `Precio`, `Distrito`, `Tipo`,
+`Habitaciones`, `Aseos`, `Superficie`, `Planta`, `Parking`, `URL` (Spanish
+names, matching the Fotocasa fields and the existing `buildings_information.csv`).
 
 ## Notes
 

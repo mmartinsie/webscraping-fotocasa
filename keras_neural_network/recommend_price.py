@@ -3,9 +3,10 @@
 Trains and compares several Keras configurations on the scraped Fotocasa dataset,
 ranks them by how well they predict the sale price of a flat and reports the most
 recommended one. The winning configuration is then retrained on the whole dataset
-and used to print a recommended price.
+and used to print a recommended price; ``--save DIR`` persists it for
+``predict.py``.
 
-    python recommend_price.py [dataset.csv] [--epochs N] [--drop-precio-m2]
+    python recommend_price.py [dataset.csv] [--epochs N] [--save model_dir]
 
 Preprocessing:
 - Features are standardized (``StandardScaler``), fit on the training set only.
@@ -13,30 +14,31 @@ Preprocessing:
   clips its predictions to a sane range (half the min .. 1.5x the max training
   price) so a diverging network cannot report absurd millions.
 
-``Precio_m2`` is kept as a predictor by default to stay consistent with
-``model.py`` / ``select_model.py``; it is strongly correlated with the target, so
-pass ``--drop-precio-m2`` for a harder, more realistic benchmark.
+By default ``Precio_m2`` is excluded: ``precio == precio_m2 * superficie`` almost
+exactly, so keeping it leaks the target and inflates the scores. Pass
+``--keep-precio-m2`` to reproduce the leaky setup used by ``model.py``.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 
-import numpy as np
-import pandas as pd
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-
+import joblib
 import keras
+import numpy as np
 from keras.callbacks import EarlyStopping
 from keras.layers import Dense, Input
 from keras.models import Sequential
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+from dataset import FEATURES as DEFAULT_FEATURES
+from dataset import LEAKY_FEATURE, TARGET, load_xy
+from metrics import format_row, score
 
 RANDOM_SEED = 42
-DEFAULT_FEATURES = ["Precio_m2", "Habitaciones", "Aseos", "Superficie", "Parking", "Colegios"]
-TARGET = "Precio"
 
 DEFAULT_EPOCHS = 200
 DEFAULT_BATCH_SIZE = 32
@@ -45,29 +47,18 @@ EARLY_STOPPING_PATIENCE = 15
 # Candidate networks to test. Each one is trained from scratch and scored on the
 # same held-out test set.
 CONFIGURATIONS = [
-    {"name": "2x6 / adam / mse",               "hidden": [6, 6],       "optimizer": "adam",    "loss": "mse"},
-    {"name": "4x6 / adam / mse",               "hidden": [6, 6, 6, 6], "optimizer": "adam",    "loss": "mse"},
-    {"name": "3x12 / adam / mse",              "hidden": [12, 12, 12], "optimizer": "adam",    "loss": "mse"},
-    {"name": "3x24 / adam / mae",              "hidden": [24, 24, 24], "optimizer": "adam",    "loss": "mae"},
-    {"name": "pyramid 32-16-8 / adam / huber", "hidden": [32, 16, 8],  "optimizer": "adam",    "loss": "huber"},
-    {"name": "3x24 / rmsprop / mse",           "hidden": [24, 24, 24], "optimizer": "rmsprop", "loss": "mse"},
+    {"name": "2x6 / adam / mse", "hidden": [6, 6], "optimizer": "adam", "loss": "mse"},
+    {"name": "4x6 / adam / mse", "hidden": [6, 6, 6, 6], "optimizer": "adam", "loss": "mse"},
+    {"name": "3x12 / adam / mse", "hidden": [12, 12, 12], "optimizer": "adam", "loss": "mse"},
+    {"name": "3x24 / adam / mae", "hidden": [24, 24, 24], "optimizer": "adam", "loss": "mae"},
+    {"name": "pyramid 32-16-8 / adam / huber", "hidden": [32, 16, 8], "optimizer": "adam", "loss": "huber"},
+    {"name": "3x24 / rmsprop / mse", "hidden": [24, 24, 24], "optimizer": "rmsprop", "loss": "mse"},
 ]
 
 
 def set_seeds(seed: int) -> None:
     np.random.seed(seed)
     keras.utils.set_random_seed(seed)
-
-
-def load_dataset(csv_route: str, features: list[str]) -> tuple[np.ndarray, np.ndarray]:
-    raw = pd.read_csv(csv_route, header=0, encoding="latin1")
-    data = raw.fillna(value=1)
-    missing = [c for c in features + [TARGET] if c not in data.columns]
-    if missing:
-        raise SystemExit(f"Dataset {csv_route} is missing columns: {missing}")
-    X = data[features].astype("float32").to_numpy()
-    y = data[TARGET].astype("float32").to_numpy()
-    return X, y
 
 
 def build_model(n_features: int, hidden: list[int], optimizer: str, loss: str) -> Sequential:
@@ -79,15 +70,6 @@ def build_model(n_features: int, hidden: list[int], optimizer: str, loss: str) -
     return model
 
 
-def score(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
-    return {
-        "mae": mean_absolute_error(y_true, y_pred),
-        "rmse": float(np.sqrt(mean_squared_error(y_true, y_pred))),
-        "r2": r2_score(y_true, y_pred),
-        "mape": float(np.mean(np.abs((y_true - y_pred) / np.clip(np.abs(y_true), 1, None))) * 100),
-    }
-
-
 def train(
     cfg: dict,
     X_train: np.ndarray,
@@ -97,9 +79,7 @@ def train(
     monitor: str = "val_loss",
 ) -> Sequential:
     model = build_model(X_train.shape[1], cfg["hidden"], cfg["optimizer"], cfg["loss"])
-    stopper = EarlyStopping(
-        monitor=monitor, patience=EARLY_STOPPING_PATIENCE, restore_best_weights=True
-    )
+    stopper = EarlyStopping(monitor=monitor, patience=EARLY_STOPPING_PATIENCE, restore_best_weights=True)
     validation_split = 0.2 if monitor.startswith("val") else 0.0
     model.fit(
         X_train,
@@ -113,6 +93,32 @@ def train(
     return model
 
 
+def save_bundle(
+    directory: str,
+    model: Sequential,
+    scaler: StandardScaler,
+    features: list[str],
+    band: tuple[float, float],
+    cfg: dict,
+    metrics: dict[str, float],
+) -> None:
+    """Persist everything ``predict.py`` needs into ``directory``."""
+    os.makedirs(directory, exist_ok=True)
+    model.save(os.path.join(directory, "model.keras"))
+    joblib.dump(scaler, os.path.join(directory, "scaler.joblib"))
+    metadata = {
+        "features": features,
+        "target": TARGET,
+        "price_band": {"low": band[0], "high": band[1]},
+        "configuration": cfg,
+        "test_metrics": metrics,
+        "seed": RANDOM_SEED,
+    }
+    with open(os.path.join(directory, "metadata.json"), "w", encoding="utf-8") as handle:
+        json.dump(metadata, handle, indent=2)
+    print(f"\nSaved model bundle to {directory}/")
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("dataset", nargs="?", default="finalDataset3.csv")
@@ -120,9 +126,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     parser.add_argument("--seed", type=int, default=RANDOM_SEED)
     parser.add_argument(
-        "--drop-precio-m2",
+        "--keep-precio-m2",
         action="store_true",
-        help="exclude the leaky Precio_m2 feature",
+        help="keep the leaky Precio_m2 feature (reproduces model.py's setup)",
+    )
+    parser.add_argument(
+        "--save",
+        metavar="DIR",
+        help="save the recommended model, scaler and metadata to DIR",
     )
     return parser.parse_args(argv)
 
@@ -132,13 +143,11 @@ def main(argv: list[str] | None = None) -> int:
     if not os.path.exists(args.dataset):
         raise SystemExit(f"Dataset not found: {args.dataset}")
 
-    features = [f for f in DEFAULT_FEATURES if not (args.drop_precio_m2 and f == "Precio_m2")]
+    features = ([LEAKY_FEATURE] if args.keep_precio_m2 else []) + DEFAULT_FEATURES
     set_seeds(args.seed)
 
-    X, y = load_dataset(args.dataset, features)
-    X_train_raw, X_test_raw, y_train, y_test = train_test_split(
-        X, y, test_size=0.30, random_state=args.seed
-    )
+    X, y = load_xy(args.dataset, features)
+    X_train_raw, X_test_raw, y_train, y_test = train_test_split(X, y, test_size=0.30, random_state=args.seed)
 
     # Standardize features on the training set only, then reuse for the test set.
     scaler = StandardScaler().fit(X_train_raw)
@@ -160,23 +169,15 @@ def main(argv: list[str] | None = None) -> int:
         model = train(cfg, X_train, y_train, args.epochs, args.batch_size)
         metrics = score(y_test, predict(model, X_test))
         results.append((cfg, metrics))
-        print(
-            "   MAE {mae:>12,.0f}   RMSE {rmse:>12,.0f}   MAPE {mape:6.1f}%   R2 {r2:7.3f}".format(
-                **metrics
-            )
-        )
+        print("   " + format_row(cfg["name"], metrics))
 
     # Lower MAE is better.
     results.sort(key=lambda item: item[1]["mae"])
 
     print("\n===================== Ranking (best first) =====================")
-    print("{:<32} {:>13} {:>13} {:>8} {:>8}".format("configuration", "MAE", "RMSE", "MAPE", "R2"))
+    print(f"{'configuration':<32} {'MAE':>13} {'RMSE':>13} {'MAPE':>8} {'R2':>8}")
     for cfg, m in results:
-        print(
-            "{:<32} {:>13,.0f} {:>13,.0f} {:>7.1f}% {:>8.3f}".format(
-                cfg["name"], m["mae"], m["rmse"], m["mape"], m["r2"]
-            )
-        )
+        print(format_row(cfg["name"], m))
 
     best_cfg, best_metrics = results[0]
     print(f"\n>>> Most recommended configuration: {best_cfg['name']}")
@@ -194,9 +195,7 @@ def main(argv: list[str] | None = None) -> int:
     # Retrain the winner on every row so the final predictor uses all the data.
     print("\nRetraining the winning model on the full dataset ...")
     full_scaler = StandardScaler().fit(X)
-    final_model = train(
-        best_cfg, full_scaler.transform(X), y, args.epochs, args.batch_size, monitor="loss"
-    )
+    final_model = train(best_cfg, full_scaler.transform(X), y, args.epochs, args.batch_size, monitor="loss")
 
     def recommend_price(flat: dict[str, float]) -> float:
         row = np.array([[flat[f] for f in features]], dtype="float32")
@@ -208,6 +207,9 @@ def main(argv: list[str] | None = None) -> int:
     for f in features:
         print(f"   {f:<12} {sample[f]:g}")
     print(f"\n>>> Recommended price: {recommend_price(sample):,.0f} EUR")
+
+    if args.save:
+        save_bundle(args.save, final_model, full_scaler, features, (lo, hi), best_cfg, best_metrics)
     return 0
 
 
