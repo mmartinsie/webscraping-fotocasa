@@ -8,45 +8,49 @@ file (`buildings_information.csv`).
 
 | File | Purpose |
 | --- | --- |
-| `main.py` | Entry point. Opens Firefox with Selenium, loads each results page, accepts the cookie banner, scrolls to force lazy-loaded cards to render, reads the district of every card and calls `scrap_page()` for each listing URL. |
-| `page_url.py` | `scrap_page(page_url, district)` — downloads a single listing page with `requests`, parses it with BeautifulSoup, fills a `Home` object (price, rooms, baths, size, floor, type, parking) and appends a row to `buildings_information.csv`. |
-| `home.py` | `Home` class representing one property, with the attributes `price`, `district`, `rooms`, `baths`, `size`, `floor`, `url`, `type`, `parking` and a `toString()` helper that prints them. |
+| `main.py` | Entry point / CLI. Opens Firefox with Selenium, walks the results pages (accept cookies, scroll for lazy-loaded cards, read each card's district), calls `scrape_listing()` per listing and writes the CSV. |
+| `listing.py` | `scrape_listing(session, url, district) -> Home \| None` — downloads one listing page with a shared `requests.Session`, parses it with BeautifulSoup and returns a populated `Home` (no side effects). |
+| `home.py` | `Home` dataclass (`url`, `district`, `price`, `property_type`, `rooms`, `baths`, `size`, `floor`, `parking`) plus `to_csv_row()` and the shared `CSV_HEADERS`. |
 
 ## Requirements
 
-- Python 3.8
+- Python 3.9+
 - [Firefox](https://www.mozilla.org/firefox/) and
-  [geckodriver](https://github.com/mozilla/geckodriver/releases)
+  [geckodriver](https://github.com/mozilla/geckodriver/releases) on `PATH`
 - Python packages:
 
   ```bash
-  pip install selenium beautifulsoup4 requests
+  pip install -r requirements.txt
   ```
 
 ## Usage
 
-1. Install geckodriver and update the path in `main.py`:
+```bash
+cd webscraping
+python main.py --pages 5 --output buildings_information.csv
+```
 
-   ```python
-   driver = webdriver.Firefox(executable_path='C:/WebDriver/bin/geckodriver.exe')
-   ```
+Point the scraper at geckodriver with `--geckodriver PATH` or the
+`GECKODRIVER_PATH` environment variable (otherwise it is looked up on `PATH`).
 
-2. Adjust the page range of the loop in `main.py` (`for k in range(1, 2)`) to
-   scrape more result pages.
-3. Run:
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `--pages` | `1` | number of search-results pages to scrape |
+| `--start-page` | `1` | first results page (1-based) |
+| `--geckodriver` | `$GECKODRIVER_PATH` | path to the geckodriver binary |
+| `--output` | `buildings_information.csv` | output CSV path |
+| `--headless` | off | run Firefox without a window |
+| `--delay` | `5.0` | seconds between listing requests |
+| `--log-level` | `INFO` | logging verbosity |
 
-   ```bash
-   cd webscraping
-   python main.py
-   ```
-
-The output CSV `buildings_information.csv` is written to the current working
-directory with the columns: `Precio`, `Distrito`, `Tipo de inmueble`,
-`Habitaciones`, `Aseos`, `Superficie`, `Planta`, `Parking`, `URL`.
+The output CSV is written with the columns `Precio`, `Distrito`,
+`Tipo de inmueble`, `Habitaciones`, `Aseos`, `Superficie`, `Planta`, `Parking`,
+`URL` (Spanish names, matching the Fotocasa fields).
 
 ## Notes
 
-- The scraper depends on Fotocasa's HTML structure and XPaths as of the time it
-  was written; the site's markup changes often, so selectors may need updating.
-- Be respectful with request rate and check Fotocasa's terms of service before
-  running large scrapes.
+- The CSS classes and XPaths are centralised as constants at the top of `main.py`
+  and `listing.py`. They reflect Fotocasa's DOM at the time of the thesis and are
+  the first thing to check if the scraper stops finding data.
+- Be respectful with the request rate and review Fotocasa's terms of service
+  before running large scrapes.

@@ -7,10 +7,10 @@ property from its characteristics, built with [Keras](https://keras.io/).
 
 | File | Purpose |
 | --- | --- |
-| `model.py` | Trains the final model: a `Sequential` network with four hidden `Dense(6, relu)` layers and a `Dense(1, relu)` output, SGD optimizer, `mean_squared_logarithmic_error` loss, 150 epochs with a 30% validation split. Prints the minimum MSLE and contains commented-out code to plot history and to predict interactively. |
-| `select_model.py` | Hyper-parameter search with `GridSearchCV` (`KerasClassifier` wrapper) over the optimizer (`SGD` vs `RMSprop`). |
+| `model.py` | Trains the thesis model (CLI): a `Sequential` network with four hidden `Dense(6, relu)` layers and a `Dense(1, relu)` output, SGD + `mean_squared_logarithmic_error`, 150 epochs, 30% validation split. Prints the minimum MSLE; `--plot` charts the history. |
+| `select_model.py` | Compares optimizers (`SGD`, `RMSprop`, `Adam` by default) with k-fold cross-validation, scoring by mean squared error, and reports the best. |
 | `recommend_price.py` | Benchmarks several network configurations and reports the one that predicts price best. See [Model recommender](#model-recommender-recommend_pricepy) below. |
-| `Notebook .ipynb` | Exploratory notebook with the same modelling workflow. |
+| `notebook.ipynb` | Exploratory notebook mirroring `model.py`. |
 | `finalDataset3.csv` / `pisos.csv` | Cleaned dataset used for training. Columns: `Precio`, `Precio_m2`, `Habitaciones`, `Aseos`, `Superficie`, `Parking`, `Colegios`, `Tipo`, `Distrito`. |
 | `finalDataset.csv` | Earlier, wider version of the dataset. |
 | `buildings_information.csv` | Raw output of the scraper (`Precio`, `Distrito`, `Tipo`, `Habitaciones`, `Aseos`, `Superficie`, `Planta`, `Parking`, `URL`). |
@@ -52,40 +52,36 @@ uses the same 6 predictors but additionally standardizes them.
    Call `recommend_price({...})` with your own feature values to price a specific
    flat.
 
-Edit the module-level constants to tune it: `CONFIGURATIONS` (candidate
-networks), `FEATURES` (remove `Precio_m2` for a harder, more realistic
-benchmark), `EPOCHS`, `BATCH_SIZE`, `RANDOM_SEED`.
+Tune it from the CLI (`--epochs`, `--batch-size`, `--seed`, `--drop-precio-m2`)
+or by editing the `CONFIGURATIONS` list at the top of the module.
 
 ## Requirements
 
-- Python 3.9 (tested; 3.8 also works)
+- Python 3.9+
 - Python packages:
 
   ```bash
-  pip install tensorflow keras scikit-learn numpy "pandas>=2.2" matplotlib
+  pip install -r requirements.txt
   ```
 
-  `pandas` must be a build compatible with the installed `numpy` (a `numpy` 2.x /
-  `pandas` 1.3 mix raises `numpy.dtype size changed`).
+  `pandas` and `matplotlib` must be builds compatible with the installed `numpy`
+  (a `numpy` 2.x / `pandas` 1.3 mix raises `numpy.dtype size changed`; an old
+  `matplotlib` raises `_ARRAY_API not found`). `pip install -U pandas matplotlib`
+  fixes both.
 
 ## Usage
 
 ```bash
 cd keras_neural_network
 
-# train the final model
-python model.py
-
-# run the optimizer grid search
-python select_model.py
-
-# benchmark configs and get a recommended price
-python recommend_price.py [path/to/dataset.csv]
+python model.py --epochs 150                 # train the thesis model
+python select_model.py --optimizers SGD Adam # cross-validate optimizers
+python recommend_price.py                    # benchmark configs, recommend a price
+python recommend_price.py pisos.csv --drop-precio-m2
 ```
 
 On Windows, if `python` opens the Microsoft Store, use the launcher: `py model.py`.
 
-`model.py` and `select_model.py` read `finalDataset3.csv` from the current
-directory (change `csv_route` at the top of each file to use a different
-dataset). `recommend_price.py` defaults to `finalDataset3.csv` and accepts an
-optional dataset path as its first argument.
+All three read `finalDataset3.csv` from the current directory by default; pass a
+different file with `--dataset` (`model.py`, `select_model.py`) or as the first
+positional argument (`recommend_price.py`).

@@ -1,56 +1,48 @@
-from funcionRelu import relu
-from capas import capa 
+"""Forward pass, backpropagation and gradient-descent update.
+
+Part of the obsolete from-scratch network; see ``README.md``.
+"""
+
 import numpy as np
 
-W_temp = []
-# Funcion error cuadratico medio
+
 def mse(Ypredich, Yreal):
+    """Return ``(mean_squared_error, residual)`` for a batch of predictions."""
+    residual = np.array(Ypredich) - np.array(Yreal)
+    return np.mean(residual ** 2), residual
 
-  # Calculamos el error
-  x = (np.array(Ypredich) - np.array(Yreal)) ** 2
-  x = np.mean(x)
 
-  # Calculamos la derivada de la funcion
-  y = np.array(Ypredich) - np.array(Yreal)
-  return (x,y)
+def entrenamiento(X, Y, red_neuronal, lr=0.05):
+    """Run one training step over ``red_neuronal`` and return its output."""
+    # Forward pass: output[i] is the activation of layer i (output[0] is the input).
+    output = [X]
+    for num_capa in range(len(red_neuronal)):
+        z = output[-1] @ red_neuronal[num_capa].W + red_neuronal[num_capa].b
+        a = red_neuronal[num_capa].funcion_act[0](z)
+        output.append(a)
 
-def entrenamiento(X,Y, red_neuronal, lr = 0.05):
+    # Backpropagation, from the output layer back to the first hidden layer.
+    back = list(range(len(output) - 1))
+    back.reverse()
 
-  # Output guardara el resultado de cada capa
-  # En la capa 1, el resultado es el valor de entrada
-  output = [X]
-  for num_capa in range(len(red_neuronal)): 
+    delta = []
+    w_next = None  # transposed weights of the layer processed just before this one
+    for layer_idx in back:
+        a = output[layer_idx + 1]
+        if layer_idx == back[0]:
+            error = mse(a, Y)[1] * red_neuronal[layer_idx].funcion_act[1](a)
+        else:
+            error = delta[-1] @ w_next * red_neuronal[layer_idx].funcion_act[1](a)
+        delta.append(error)
 
-    z = output[-1] @ red_neuronal[num_capa].W + red_neuronal[num_capa].b
+        w_next = red_neuronal[layer_idx].W.transpose()
 
-    a = red_neuronal[num_capa].funcion_act[0](z)
+        # Gradient descent update.
+        red_neuronal[layer_idx].b = (
+            red_neuronal[layer_idx].b - np.mean(delta[-1], axis=0, keepdims=True) * lr
+        )
+        red_neuronal[layer_idx].W = (
+            red_neuronal[layer_idx].W - output[layer_idx].transpose() @ delta[-1] * lr
+        )
 
-    # Incluimos el resultado de la capa a output
-    output.append(a)
-
-  # Backpropagation
-
-  back = list(range(len(output)-1))
-  back.reverse()
-
-  # Guardaremos el error de la capa en delta  
-  delta = []
-  for capa in back:
-    # Backprop #delta
-
-    a = output[capa+1]
-
-    if capa == back[0]:
-      x = mse(a,Y)[1] * red_neuronal[capa].funcion_act[1](a)
-      delta.append(x)
-
-    else:
-      x = delta[-1] @ W_temp * red_neuronal[capa].funcion_act[1](a)
-      delta.append(x)
-
-    W_temp = red_neuronal[capa].W.transpose()
-    # Gradient Descent #
-    red_neuronal[capa].b = red_neuronal[capa].b - np.mean(delta[-1], axis = 0, keepdims = True) * lr
-    red_neuronal[capa].W = red_neuronal[capa].W - output[capa].transpose() @ delta[-1] * lr
-    
-  return output[-1]
+    return output[-1]

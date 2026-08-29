@@ -1,0 +1,13 @@
+# Normalise line endings: LF in the repo, native on checkout is fine for text.
+* text=auto eol=lf
+
+*.py    text eol=lf
+*.md    text eol=lf
+*.txt   text eol=lf
+*.ipynb text eol=lf
+
+# Diff notebooks as text, but never attempt a line-wise merge.
+*.ipynb merge=binary
+
+# Leave the scraped data files exactly as committed (do not renormalize).
+*.csv -text

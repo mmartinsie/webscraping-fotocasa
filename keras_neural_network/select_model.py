@@ -1,60 +1,101 @@
-from numpy import loadtxt
-from keras.models import Sequential
-from keras.layers import Dense
-import keras as keras
-from io import open
-import csv
-import numpy as np
-import pandas
-import sys
-import matplotlib.pyplot as plt
-from sklearn.model_selection import GridSearchCV
-from keras.wrappers.scikit_learn import KerasClassifier
+"""Compare optimizers for the price-prediction model with k-fold cross-validation.
 
-def create_model(optimizer='adam'):
-    # create model
-    model = Sequential()
-    model.add(Dense(6, input_dim=6, activation='relu'))
-    model.add(Dense(6, activation='relu'))
-    model.add(Dense(6, activation='relu'))
-    model.add(Dense(1, activation='relu'))
-    # Compile model
-    model.compile(loss='mse', optimizer=optimizer, metrics=['accuracy','mse'])
+For each candidate optimizer a fresh network is trained on every fold and scored
+by mean squared error on the held-out fold; the optimizer with the lowest mean
+MSE wins.
+
+    python select_model.py --optimizers SGD RMSprop Adam --folds 3
+"""
+
+from __future__ import annotations
+
+import argparse
+
+import numpy as np
+import pandas as pd
+from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import KFold
+
+import keras
+from keras.layers import Dense, Input
+from keras.models import Sequential
+
+RANDOM_SEED = 42
+N_FEATURES = 6
+DROP_COLUMNS = ["Tipo", "Distrito"]
+
+
+def load_xy(dataset: str) -> tuple[np.ndarray, np.ndarray]:
+    raw = pd.read_csv(dataset, header=0, encoding="latin1")
+    data = raw.fillna(value=1).drop(DROP_COLUMNS, axis=1).to_numpy()
+    return data[:, 2:8].astype("float32"), data[:, 1].astype("float32")
+
+
+def create_model(optimizer: str) -> Sequential:
+    model = Sequential(
+        [
+            Input(shape=(N_FEATURES,)),
+            Dense(6, activation="relu"),
+            Dense(6, activation="relu"),
+            Dense(1, activation="relu"),
+        ]
+    )
+    model.compile(loss="mse", optimizer=optimizer, metrics=["mse"])
     return model
 
-# https://machinelearningmastery.com/tutorial-first-neural-network-python-keras/
-# Charge the csv
-np.set_printoptions(threshold=sys.maxsize)
 
-csv_route = 'finalDataset3.csv'
+def cross_val_mse(
+    optimizer: str,
+    X: np.ndarray,
+    y: np.ndarray,
+    folds: int,
+    epochs: int,
+    batch_size: int,
+) -> np.ndarray:
+    """Return the per-fold validation MSE for ``optimizer``."""
+    kfold = KFold(n_splits=folds, shuffle=True, random_state=RANDOM_SEED)
+    scores = []
+    for train_idx, val_idx in kfold.split(X):
+        model = create_model(optimizer)
+        model.fit(
+            X[train_idx], y[train_idx], epochs=epochs, batch_size=batch_size, verbose=0
+        )
+        pred = model.predict(X[val_idx], verbose=0).ravel()
+        scores.append(mean_squared_error(y[val_idx], pred))
+    return np.array(scores)
 
-# csv_route = 'pisos.csv'
-dataNaN = pandas.read_csv(csv_route, header=0, encoding='latin1')
-data = dataNaN.fillna(value=1).drop(['Tipo','Distrito'],axis=1).to_numpy()
-# data = dataNaN.fillna(value=1).drop(['Tipo','Distrito','Precio_m2','Habitaciones','Parking','Colegios'],axis=1).to_numpy()
 
-# 6 variables 
-X = data[:,2:8]
-# X = data[:,2:4]
-Y = data[:,1]
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--dataset", default="finalDataset3.csv")
+    parser.add_argument("--epochs", type=int, default=100)
+    parser.add_argument("--batch-size", type=int, default=10)
+    parser.add_argument("--folds", type=int, default=3)
+    parser.add_argument(
+        "--optimizers", nargs="+", default=["SGD", "RMSprop", "Adam"]
+    )
+    return parser.parse_args(argv)
 
 
-# Compile the keras model 
-#  'mean_absolute_error': Computes the mean absolute error between the labels and predictions.
-# optimizer='sgd','rmsprop','adam'
-# loss = 'mean_squared_logarithmic_error', 'huber', 'log_cosh', 'mean_squared_error','mean_absolute_error'.
-# https://www.tensorflow.org/api_docs/python/tf/keras/Model
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    np.random.seed(RANDOM_SEED)
+    keras.utils.set_random_seed(RANDOM_SEED)
 
-model = KerasClassifier(build_fn=create_model, epochs=100, batch_size=10, verbose=0)
-# define the grid search parameters
-optimizer = ['SGD', 'RMSprop']
-param_grid = dict(optimizer=optimizer)
-grid = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=-1, cv=3)
-grid_result = grid.fit(X, Y)
-# summarize results
-print("Best: %f using %s" % (grid_result.best_score_, grid_result.best_params_))
-means = grid_result.cv_results_['mean_test_score']
-stds = grid_result.cv_results_['std_test_score']
-params = grid_result.cv_results_['params']
-for mean, stdev, param in zip(means, stds, params):
-    print("%f (%f) with: %r" % (mean, stdev, param))
+    X, y = load_xy(args.dataset)
+
+    results = {}
+    for optimizer in args.optimizers:
+        scores = cross_val_mse(
+            optimizer, X, y, args.folds, args.epochs, args.batch_size
+        )
+        results[optimizer] = scores
+        print(f"{optimizer:<10} MSE {scores.mean():,.0f} (+/- {scores.std():,.0f})")
+
+    best = min(results, key=lambda name: results[name].mean())
+    print(f"\nBest: {best} (mean MSE {results[best].mean():,.0f})")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

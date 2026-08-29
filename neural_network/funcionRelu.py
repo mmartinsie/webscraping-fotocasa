@@ -1,44 +1,39 @@
+"""Activation functions and their derivatives.
+
+Each activation is a ``(function, derivative)`` tuple so the training loop can
+call ``act[0](x)`` on the forward pass and ``act[1](x)`` on the backward pass.
+
+Part of the obsolete from-scratch network; see ``README.md``.
+"""
+
 import numpy as np
-import math
-import matplotlib.pyplot as plt
+
 
 def derivada_relu(x):
-  x[x<=0] = 0
-  x[x>0] = 1
-  return x
+    x[x <= 0] = 0
+    x[x > 0] = 1
+    return x
+
 
 relu = (
-  lambda x: x * (x > 0),
-  lambda x: derivada_relu(x)
-  )
+    lambda x: x * (x > 0),
+    lambda x: derivada_relu(x),
+)
+
 
 def derivada_idem(x):
-  x[x<0] = -1
-  x[x==0] = 0
-  x[x>0] = 1
-  return x
+    x[x < 0] = -1
+    x[x == 0] = 0
+    x[x > 0] = 1
+    return x
+
 
 idem = (
-  lambda x: x,
-  lambda x: derivada_idem(x)
-  )
+    lambda x: x,
+    lambda x: derivada_idem(x),
+)
 
 sigmoid = (
-  lambda x:1 / (1 + np.exp(-x)),
-  lambda x:x * (1 - x)
-  )
-
-
-# datos_relu = relu[0](rango)
-# datos_relu_derivada = relu[1](rango)
-
-
-# # Volvemos a definir rango que ha sido cambiado
-# rango = np.linspace(-10,10).reshape([50,1])
-
-# # Cremos los graficos
-# plt.cla()
-# fig, axes = plt.subplots(nrows=1, ncols=2, figsize =(15,5))
-# axes[0].plot(rango, datos_relu[:,0])
-# axes[1].plot(rango, datos_relu_derivada[:,0])
-# plt.show()
+    lambda x: 1 / (1 + np.exp(-x)),
+    lambda x: x * (1 - x),
+)

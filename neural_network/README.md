@@ -12,29 +12,32 @@ framework, following
 
 | File | Purpose |
 | --- | --- |
-| `neurona.py` | Entry point. Loads `buildings_information.csv`, builds the network (layer sizes `[1, 2, 1]`, ReLU activations), trains it for a few epochs and plots the error. |
+| `neurona.py` | Entry point / CLI. Loads the scraped CSV, builds the network (layer sizes `[1, 2, 1]`, ReLU activations), trains it for a few epochs and prints the per-epoch error (`--plot` to chart it). |
 | `capas.py` | `capa` class — one dense layer. Initializes the weight matrix `W` and bias vector `b` with a truncated normal distribution. |
 | `entrenamiento.py` | `entrenamiento()` (forward pass + backpropagation + gradient descent) and `mse()` (mean squared error and its derivative). |
 | `funcionRelu.py` | Activation functions and their derivatives: `relu`, `idem` (identity), `sigmoid`. |
 
+Only comments, structure and obvious bugs were cleaned up here — the algorithm
+and its (Spanish) identifier names are left as they were.
+
 ## Requirements
 
-- Python 3.8
+- Python 3.9+
 - Python packages:
 
   ```bash
-  pip install numpy scipy pandas matplotlib
+  pip install -r requirements.txt
   ```
 
 ## Usage
 
 ```bash
 cd neural_network
-python neurona.py
+python neurona.py --dataset ../keras_neural_network/buildings_information.csv
 ```
 
-Expects a `buildings_information.csv` file (produced by the
-[`../webscraping`](../webscraping) scripts) in the current directory.
+`--dataset` defaults to `buildings_information.csv` in the current directory (the
+raw output of the [`../webscraping`](../webscraping) scripts).
 
 ## Known limitations
 

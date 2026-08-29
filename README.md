@@ -11,16 +11,15 @@ based on its characteristics.
 Contained in the `/webscraping` directory, it is made up of three scripts:
 
 - `main.py`
-    - Main program that drives the scraping of the website. Its main goals are
-      accepting cookies through the *Selenium* library, navigating the different
-      pages of the search results and, finally, calling the `scrap_page()`
-      function.
+    - Command-line entry point. Drives Firefox through *Selenium* (accept
+      cookies, page through the search results, read each card's district),
+      calls `scrape_listing()` per listing and writes the CSV.
+- `listing.py`
+    - `scrape_listing()` downloads and parses a single listing page and returns
+      a populated `Home`.
 - `home.py`
-    - Definition of the class that represents a property. The class has the
-      attributes: `price`, `district`, `rooms`, `baths`, `size`, `floor`, `url`,
-      `type` and `parking`.
-- `page_url.py`
-    - Runs the scraping logic for each of the pages provided by the main script.
+    - `Home` dataclass representing one property (`url`, `district`, `price`,
+      `property_type`, `rooms`, `baths`, `size`, `floor`, `parking`).
 
 See [`webscraping/README.md`](webscraping/README.md) for details.
 
