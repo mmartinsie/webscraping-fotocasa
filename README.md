@@ -30,7 +30,9 @@ There are two neural-network implementations in this repository. The first one,
 in the `/neural_network` directory, is obsolete and unused — it was a first
 iteration written from scratch with NumPy. The second one, in the
 `/keras_neural_network` directory, is the final implementation using the Python
-library *Keras*.
+library *Keras*. That directory also includes `recommend_price.py`, which
+benchmarks several network configurations, reports the one that predicts price
+best and prints a recommended price for a flat.
 
 See [`neural_network/README.md`](neural_network/README.md) and
 [`keras_neural_network/README.md`](keras_neural_network/README.md) for details.

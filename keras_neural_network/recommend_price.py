@@ -12,6 +12,12 @@ Usage:
 
 If no dataset path is given, ``finalDataset3.csv`` is used.
 
+Preprocessing:
+- Features are standardized (``StandardScaler``), fit on the training set only.
+- The target ``Precio`` is trained on its raw EUR scale. Every configuration also
+  clips its predictions to a sane range (half the min .. 1.5x the max training
+  price) so a diverging network cannot report absurd millions.
+
 Note: ``Precio_m2`` is kept as a predictor to stay consistent with ``model.py``
 and ``select_model.py``. It is strongly correlated with the target, so the
 reported errors are optimistic; drop it from ``FEATURES`` for a harder, more
@@ -27,6 +33,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
+from keras.callbacks import EarlyStopping
 from keras.layers import Dense, Input
 from keras.models import Sequential
 
@@ -34,18 +41,18 @@ RANDOM_SEED = 42
 FEATURES = ["Precio_m2", "Habitaciones", "Aseos", "Superficie", "Parking", "Colegios"]
 TARGET = "Precio"
 
-EPOCHS = 120
+EPOCHS = 200
 BATCH_SIZE = 32
 
 # Candidate networks to test. Each one is trained from scratch and scored on the
 # same held-out test set.
 CONFIGURATIONS = [
-    {"name": "2x6 / adam / msle",        "hidden": [6, 6],       "optimizer": "adam",    "loss": "mean_squared_logarithmic_error"},
-    {"name": "4x6 / adam / msle",        "hidden": [6, 6, 6, 6], "optimizer": "adam",    "loss": "mean_squared_logarithmic_error"},
-    {"name": "4x6 / sgd / msle",         "hidden": [6, 6, 6, 6], "optimizer": "sgd",     "loss": "mean_squared_logarithmic_error"},
-    {"name": "3x12 / adam / mse",        "hidden": [12, 12, 12], "optimizer": "adam",    "loss": "mean_squared_error"},
-    {"name": "pyramid 16-8-4 / rmsprop", "hidden": [16, 8, 4],   "optimizer": "rmsprop", "loss": "mean_squared_error"},
-    {"name": "3x24 / adam / mae",        "hidden": [24, 24, 24], "optimizer": "adam",    "loss": "mean_absolute_error"},
+    {"name": "2x6 / adam / mse",          "hidden": [6, 6],       "optimizer": "adam",    "loss": "mse"},
+    {"name": "4x6 / adam / mse",          "hidden": [6, 6, 6, 6], "optimizer": "adam",    "loss": "mse"},
+    {"name": "3x12 / adam / mse",         "hidden": [12, 12, 12], "optimizer": "adam",    "loss": "mse"},
+    {"name": "3x24 / adam / mae",         "hidden": [24, 24, 24], "optimizer": "adam",    "loss": "mae"},
+    {"name": "pyramid 32-16-8 / adam / huber", "hidden": [32, 16, 8], "optimizer": "adam", "loss": "huber"},
+    {"name": "3x24 / rmsprop / mse",      "hidden": [24, 24, 24], "optimizer": "rmsprop", "loss": "mse"},
 ]
 
 
@@ -80,12 +87,13 @@ def score(y_true, y_pred):
     }
 
 
-def evaluate_configuration(cfg, X_train, X_test, y_train, y_test):
+def train(cfg, X_train, y_train, monitor="val_loss"):
     model = build_model(X_train.shape[1], cfg["hidden"], cfg["optimizer"], cfg["loss"])
-    model.fit(X_train, y_train, validation_split=0.2, epochs=EPOCHS,
-              batch_size=BATCH_SIZE, verbose=0)
-    y_pred = model.predict(X_test, verbose=0).ravel()
-    return score(y_test, y_pred)
+    stopper = EarlyStopping(monitor=monitor, patience=15, restore_best_weights=True)
+    validation_split = 0.2 if monitor.startswith("val") else 0.0
+    model.fit(X_train, y_train, validation_split=validation_split, epochs=EPOCHS,
+              batch_size=BATCH_SIZE, verbose=0, callbacks=[stopper])
+    return model
 
 
 def main():
@@ -106,10 +114,16 @@ def main():
         X, y, test_size=0.30, random_state=RANDOM_SEED
     )
 
-    # Standardize on the training set only, then reuse for the test set.
+    # Standardize features on the training set only, then reuse for the test set.
     scaler = StandardScaler().fit(X_train_raw)
     X_train = scaler.transform(X_train_raw)
     X_test = scaler.transform(X_test_raw)
+
+    # Guardrail: keep predictions inside a sane price band.
+    lo, hi = float(y_train.min()) * 0.5, float(y_train.max()) * 1.5
+
+    def predict(model, feats):
+        return np.clip(model.predict(feats, verbose=0).ravel(), lo, hi)
 
     print("Dataset: {}  |  samples: {}  |  features: {}".format(csv_route, len(X), FEATURES))
     print("Train / test split: {} / {}\n".format(len(X_train), len(X_test)))
@@ -117,7 +131,8 @@ def main():
     results = []
     for cfg in CONFIGURATIONS:
         print("Training  {} ...".format(cfg["name"]))
-        metrics = evaluate_configuration(cfg, X_train, X_test, y_train, y_test)
+        model = train(cfg, X_train, y_train)
+        metrics = score(y_test, predict(model, X_test))
         results.append((cfg, metrics))
         print("   MAE {mae:>12,.0f}   RMSE {rmse:>12,.0f}   MAPE {mape:6.1f}%   R2 {r2:7.3f}".format(**metrics))
 
@@ -125,9 +140,9 @@ def main():
     results.sort(key=lambda item: item[1]["mae"])
 
     print("\n===================== Ranking (best first) =====================")
-    print("{:<28} {:>13} {:>13} {:>8} {:>8}".format("configuration", "MAE", "RMSE", "MAPE", "R2"))
+    print("{:<32} {:>13} {:>13} {:>8} {:>8}".format("configuration", "MAE", "RMSE", "MAPE", "R2"))
     for cfg, m in results:
-        print("{:<28} {:>13,.0f} {:>13,.0f} {:>7.1f}% {:>8.3f}".format(
+        print("{:<32} {:>13,.0f} {:>13,.0f} {:>7.1f}% {:>8.3f}".format(
             cfg["name"], m["mae"], m["rmse"], m["mape"], m["r2"]))
 
     best_cfg, best_metrics = results[0]
@@ -140,12 +155,11 @@ def main():
     # Retrain the winner on every row so the final predictor uses all the data.
     print("\nRetraining the winning model on the full dataset ...")
     full_scaler = StandardScaler().fit(X)
-    final_model = build_model(X.shape[1], best_cfg["hidden"], best_cfg["optimizer"], best_cfg["loss"])
-    final_model.fit(full_scaler.transform(X), y, epochs=EPOCHS, batch_size=BATCH_SIZE, verbose=0)
+    final_model = train(best_cfg, full_scaler.transform(X), y, monitor="loss")
 
     def recommend_price(flat):
         row = np.array([[flat[f] for f in FEATURES]], dtype="float32")
-        return float(final_model.predict(full_scaler.transform(row), verbose=0).ravel()[0])
+        return float(predict(final_model, full_scaler.transform(row))[0])
 
     # Example flat = column-wise medians of the dataset.
     sample = {f: float(np.median(X[:, i])) for i, f in enumerate(FEATURES)}
