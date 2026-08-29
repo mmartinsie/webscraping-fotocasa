@@ -1,29 +1,55 @@
 # Web Scraping Fotocasa
 
-Este repositorio contiene todos los script desarrollado para la realización del trabajo final de máster "Categorización de los inmuebles de la ciudad de Madrid". Está compuesto por dos partes, por un lado está el rascado de información desde la página web de Fotocasa y, por otro lado, la red neuronal que precide el precio de un inmueble en función de la introducción de sus características. 
+This repository contains all the scripts developed for the Master's thesis
+*"Categorization of real-estate properties in the city of Madrid"*. It is made up
+of two parts: on one side, the scraping of information from the Fotocasa website
+and, on the other side, the neural network that predicts the price of a property
+based on its characteristics.
 
-## Webscraping Fotocasa
-Contenido en el directorio `/webscraping`, esta compuesto por tres script: 
+## Web scraping Fotocasa
+
+Contained in the `/webscraping` directory, it is made up of three scripts:
+
 - `main.py`
-    - Este script contiene el programa principal que gestionará el rascado de la página web. Su objetivo principal es la aceptación de cookies, mediante la libreria *Selenium*; la iteractuación con las distintas páginas de la búsqueda y; por último, la llamada a la función `scrape_page()`.
+    - Main program that drives the scraping of the website. Its main goals are
+      accepting cookies through the *Selenium* library, navigating the different
+      pages of the search results and, finally, calling the `scrap_page()`
+      function.
 - `home.py`
-    - Este script contiene la definición de la clase que representa un inmueble. Esta clase está compuesta por los atributos: `price`, `district`, `rooms`, `baths`, `size`, `floor`, `url`, `type` y `parking`.
-- `page_url.py`.
-    - Este script realiza la funcionalidad de rascado para cada una de las páginas proporcionadas desde el script principal. 
+    - Definition of the class that represents a property. The class has the
+      attributes: `price`, `district`, `rooms`, `baths`, `size`, `floor`, `url`,
+      `type` and `parking`.
+- `page_url.py`
+    - Runs the scraping logic for each of the pages provided by the main script.
 
-## Red neuronal
-Existen dos desarrollos de una red neuronal en este repositorio. El primero de ellos, en el directorio `/neural_network`, se encuentra obsoleto y sin uso, pues fue una primera iteración. En segundo lugar está el directorio `/keras_neural_network`, el cual contiene el desarrollo final de la red neuronal empleando la biblioteca de Python, *keras*.
+See [`webscraping/README.md`](webscraping/README.md) for details.
 
-## Autores ✒️
-Este repositorio está realizado por:
+## Neural network
+
+There are two neural-network implementations in this repository. The first one,
+in the `/neural_network` directory, is obsolete and unused — it was a first
+iteration written from scratch with NumPy. The second one, in the
+`/keras_neural_network` directory, is the final implementation using the Python
+library *Keras*.
+
+See [`neural_network/README.md`](neural_network/README.md) and
+[`keras_neural_network/README.md`](keras_neural_network/README.md) for details.
+
+## Authors ✒️
+
+This repository was created by:
+
 - Esther Gabay Diaz
-- Adrián Caminmo Muñoz - [adrian98cm](https://github.com/adrian98cm)
+- Adrián Camino Muñoz - [adrian98cm](https://github.com/adrian98cm)
 - María González de la Llana Domarco
-- Manuel Martín Sierra - [mmartinsie](https://github.com/mmmartinsie)
+- Manuel Martín Sierra - [mmartinsie](https://github.com/mmartinsie)
 - Miriam Ramón González - [MiriamRG13](https://github.com/MiriamRG13)
 
-## Referencias
-A continuación se muestran las web que se ha empleado para el desarrollo del proyecto.
-- [Ejemplo de la página web Edureka](https://www.edureka.co/blog/web-scraping-with-python/)
-- [Ander Fernández - Cómo programar una red neuronal desde 0 en Python](https://anderfernandez.com/blog/como-programar-una-red-neuronal-desde-0-en-python/)
-- [W3Schools - Python](https://www.w3schools.com/python/python_classes.asp)
+## References
+
+The websites used during the development of the project:
+
+- [Web scraping with Python example — Edureka](https://www.edureka.co/blog/web-scraping-with-python/)
+- [Ander Fernández — How to program a neural network from scratch in Python](https://anderfernandez.com/blog/como-programar-una-red-neuronal-desde-0-en-python/)
+- [W3Schools — Python classes](https://www.w3schools.com/python/python_classes.asp)
+- [Machine Learning Mastery — Your first neural network in Python with Keras](https://machinelearningmastery.com/tutorial-first-neural-network-python-keras/)
