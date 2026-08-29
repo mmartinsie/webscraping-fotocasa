@@ -27,7 +27,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-from keras.layers import Dense
+from keras.layers import Dense, Input
 from keras.models import Sequential
 
 RANDOM_SEED = 42
@@ -62,7 +62,8 @@ def load_dataset(csv_route):
 
 def build_model(n_features, hidden, optimizer, loss):
     model = Sequential()
-    model.add(Dense(hidden[0], input_dim=n_features, activation="relu"))
+    model.add(Input(shape=(n_features,)))
+    model.add(Dense(hidden[0], activation="relu"))
     for units in hidden[1:]:
         model.add(Dense(units, activation="relu"))
     model.add(Dense(1, activation="linear"))
