@@ -47,7 +47,8 @@ iteration written from scratch with NumPy. The second one, in the
 `/keras_neural_network` directory, is the final implementation using the Python
 library *Keras*. That directory also includes `recommend_price.py` (benchmarks
 several network configs, recommends one, and can save it), `predict.py` (price a
-flat from a saved model) and `baseline.py` (non-neural reference numbers).
+flat from a saved model), `baseline.py` (non-neural reference numbers) and
+`chat.py` (a Claude-powered chat that asks for the inputs and returns the price).
 
 See [`neural_network/README.md`](neural_network/README.md) and
 [`keras_neural_network/README.md`](keras_neural_network/README.md) for details.

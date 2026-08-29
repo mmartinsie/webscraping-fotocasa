@@ -14,6 +14,7 @@ See [`DATA.md`](DATA.md) for the datasets and their columns.
 | `recommend_price.py` | Benchmarks several network configurations, reports the best and (with `--save DIR`) persists it. See [Model recommender](#model-recommender-recommend_pricepy). |
 | `baseline.py` | Non-neural references (mean predictor, linear regression, random forest) on the same features/split, so the network has something to beat. |
 | `predict.py` | Loads a saved bundle and prices a single flat from CLI feature values. |
+| `chat.py` | Conversational front-end: Claude asks you for the five features, then calls the saved model and tells you the price. See [Chat estimator](#chat-estimator-chatpy). |
 | `dataset.py` / `metrics.py` | Shared dataset loading and regression scoring. |
 | `notebook.ipynb` | Exploratory notebook mirroring `model.py`. |
 
@@ -83,3 +84,22 @@ On Windows, if `python` opens the Microsoft Store, use the launcher: `py model.p
 Every script reads `finalDataset3.csv` from the current directory by default;
 pass another file with `--dataset` (`model.py`, `select_model.py`) or as the
 first positional argument (`recommend_price.py`, `baseline.py`).
+
+## Chat estimator (`chat.py`)
+
+A conversational front-end powered by Claude. It asks you for the five features
+(rooms, bathrooms, m², parking, nearby schools), then calls the saved model via a
+tool and reports the price — you never touch the CLI flags.
+
+```bash
+python recommend_price.py --save model_dir   # once: train and save the model
+export ANTHROPIC_API_KEY=sk-ant-...          # or run `ant auth login`
+python chat.py model_dir                      # --model claude-haiku-4-5 for a cheaper run
+```
+
+How it works: `chat.py` runs a short tool-use loop against the Anthropic
+Messages API. Claude collects the inputs in natural language, calls the
+`predict_price` tool (which runs `predict.py`'s model bundle locally), and turns
+the result into a sentence. The API key and Claude usage are billed to you;
+everything else stays on your machine.
+
