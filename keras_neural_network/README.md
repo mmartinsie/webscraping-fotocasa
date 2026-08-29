@@ -9,6 +9,7 @@ property from its characteristics, built with [Keras](https://keras.io/).
 | --- | --- |
 | `model.py` | Trains the final model: a `Sequential` network with four hidden `Dense(6, relu)` layers and a `Dense(1, relu)` output, SGD optimizer, `mean_squared_logarithmic_error` loss, 150 epochs with a 30% validation split. Prints the minimum MSLE and contains commented-out code to plot history and to predict interactively. |
 | `select_model.py` | Hyper-parameter search with `GridSearchCV` (`KerasClassifier` wrapper) over the optimizer (`SGD` vs `RMSprop`). |
+| `recommend_price.py` | Trains and compares several network configurations (layers, optimizer, loss) on a held-out test set, ranks them by MAE / RMSE / MAPE / R², prints the most recommended one, then retrains the winner on the full dataset and outputs a recommended price for a sample flat. Run `python recommend_price.py [dataset.csv]`. |
 | `Notebook .ipynb` | Exploratory notebook with the same modelling workflow. |
 | `finalDataset3.csv` / `pisos.csv` | Cleaned dataset used for training. Columns: `Precio`, `Precio_m2`, `Habitaciones`, `Aseos`, `Superficie`, `Parking`, `Colegios`, `Tipo`, `Distrito`. |
 | `finalDataset.csv` | Earlier, wider version of the dataset. |
