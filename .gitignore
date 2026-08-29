@@ -22,10 +22,13 @@ Thumbs.db
 .pytest_cache/
 .ruff_cache/
 
-# Saved model bundles (recommend_price.py --save)
+# Saved model bundles (recommend_price.py --save). The web demo commits only the
+# exported docs/model.json, never the bundle itself.
 *.keras
+*.joblib
 model_dir/
 tmp_model/
+web_model/
 
 # Scratch run logs
 run*.out

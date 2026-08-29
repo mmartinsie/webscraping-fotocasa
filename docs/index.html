@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tasador de pisos de Madrid</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f4f4f5;
+    --card: #ffffff;
+    --fg: #18181b;
+    --muted: #71717a;
+    --border: #d4d4d8;
+    --accent: #2563eb;
+    --accent-fg: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #18181b;
+      --card: #27272a;
+      --fg: #f4f4f5;
+      --muted: #a1a1aa;
+      --border: #3f3f46;
+      --accent: #3b82f6;
+      --accent-fg: #ffffff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 2rem 1rem;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.55 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    display: flex;
+    justify-content: center;
+  }
+  .wrap { width: 100%; max-width: 460px; }
+  h1 { font-size: 1.4rem; margin: 0 0 .3rem; }
+  .lede { color: var(--muted); margin: 0 0 1.5rem; font-size: .95rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+  }
+  label { display: block; margin: .9rem 0 .3rem; font-weight: 600; font-size: .9rem; }
+  label:first-of-type { margin-top: 0; }
+  .hint { font-weight: 400; color: var(--muted); }
+  input[type="number"] {
+    width: 100%;
+    padding: .55rem .65rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+  }
+  .check { display: flex; align-items: center; gap: .5rem; margin-top: .9rem; }
+  .check label { margin: 0; }
+  button {
+    margin-top: 1.3rem;
+    width: 100%;
+    padding: .7rem;
+    border: 0;
+    border-radius: 8px;
+    background: var(--accent);
+    color: var(--accent-fg);
+    font: 600 1rem system-ui, sans-serif;
+    cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: default; }
+  .result {
+    margin-top: 1.3rem;
+    padding: 1rem;
+    border-radius: 10px;
+    background: var(--bg);
+    border: 1px dashed var(--border);
+    text-align: center;
+  }
+  .price { font-size: 1.9rem; font-weight: 700; }
+  .result small { color: var(--muted); display: block; margin-top: .3rem; }
+  .about, footer {
+    margin-top: 1.1rem;
+    font-size: .8rem;
+    color: var(--muted);
+  }
+  footer a { color: var(--accent); }
+  .err { color: #dc2626; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Tasador de pisos de Madrid</h1>
+  <p class="lede">Estima el precio de venta con la red neuronal del TFM. El modelo
+    corre entero en tu navegador.</p>
+
+  <div class="card">
+    <form id="form">
+      <label for="Habitaciones">Habitaciones</label>
+      <input type="number" id="Habitaciones" min="1" step="1" value="3" required>
+
+      <label for="Aseos">Aseos</label>
+      <input type="number" id="Aseos" min="1" step="1" value="2" required>
+
+      <label for="Superficie">Superficie <span class="hint">(m²)</span></label>
+      <input type="number" id="Superficie" min="15" step="1" value="90" required>
+
+      <label for="Colegios">Colegios cercanos
+        <span class="hint">(si no lo sabes, deja 9)</span></label>
+      <input type="number" id="Colegios" min="0" step="1" value="9" required>
+
+      <div class="check">
+        <input type="checkbox" id="Parking">
+        <label for="Parking">Tiene plaza de parking</label>
+      </div>
+
+      <button type="submit" id="submit" disabled>Cargando modelo…</button>
+    </form>
+
+    <div class="result" id="result" hidden>
+      <div class="price" id="price">—</div>
+      <small id="note"></small>
+    </div>
+
+    <p class="about" id="about"></p>
+  </div>
+
+  <footer>
+    Estimación aproximada de un modelo entrenado con datos de Fotocasa (~2020);
+    no es una tasación profesional.
+    <a href="https://github.com/mmartinsie/webscraping-fotocasa">Código en GitHub</a>.
+  </footer>
+</div>
+
+<script>
+const relu = (x) => (x > 0 ? x : 0);
+let M = null;
+
+function predict(values) {
+  // values: numbers in M.features order
+  let v = values.map((x, i) => (x - M.scaler.mean[i]) / M.scaler.scale[i]);
+  for (const layer of M.layers) {
+    const out = new Array(layer.b.length);
+    for (let j = 0; j < layer.b.length; j++) {
+      let s = layer.b[j];
+      for (let i = 0; i < v.length; i++) s += v[i] * layer.W[i][j];
+      out[j] = layer.activation === "relu" ? relu(s) : s;
+    }
+    v = out;
+  }
+  let price = v[0];
+  let clamped = false;
+  if (M.band && M.band.low != null && price < M.band.low) { price = M.band.low; clamped = true; }
+  if (M.band && M.band.high != null && price > M.band.high) { price = M.band.high; clamped = true; }
+  return { price, clamped };
+}
+
+function eur(n) {
+  return Math.round(n).toLocaleString("es-ES") + " €";
+}
+
+async function init() {
+  const submit = document.getElementById("submit");
+  const about = document.getElementById("about");
+  try {
+    M = await (await fetch("model.json", { cache: "no-cache" })).json();
+  } catch (e) {
+    submit.textContent = "No se pudo cargar el modelo";
+    about.innerHTML = '<span class="err">Abre esta página desde el sitio publicado '
+      + '(o sirviéndola con <code>python -m http.server</code>): '
+      + '<code>file://</code> no permite cargar model.json.</span>';
+    return;
+  }
+  submit.disabled = false;
+  submit.textContent = "Calcular precio";
+  const mae = M.meta.mae != null ? eur(M.meta.mae) : "n/d";
+  const r2 = M.meta.r2 != null ? M.meta.r2.toFixed(2) : "n/d";
+  about.textContent = `Modelo: ${M.meta.config || "red neuronal"} · error medio ≈ `
+    + `${mae} · R² ${r2} · generado ${M.meta.generated || ""}`;
+}
+
+document.getElementById("form").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  if (!M) return;
+  const values = M.features.map((name) => {
+    const el = document.getElementById(name);
+    if (!el) return 0;
+    return el.type === "checkbox" ? (el.checked ? 1 : 0) : parseFloat(el.value || "0");
+  });
+  const { price, clamped } = predict(values);
+  document.getElementById("result").hidden = false;
+  document.getElementById("price").textContent = eur(price);
+  document.getElementById("note").textContent = clamped
+    ? "valor recortado al rango de precios del dataset"
+    : "estimación del modelo";
+});
+
+init();
+</script>
+</body>
+</html>

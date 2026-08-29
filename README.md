@@ -6,6 +6,9 @@ of two parts: on one side, the scraping of information from the Fotocasa website
 and, on the other side, the neural network that predicts the price of a property
 based on its characteristics.
 
+**[Live demo](https://mmartinsie.github.io/webscraping-fotocasa/)** — a static
+page (in `docs/`) that runs the trained model entirely in the browser.
+
 ## Pipeline
 
 ```

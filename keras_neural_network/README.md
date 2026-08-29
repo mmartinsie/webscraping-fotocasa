@@ -15,6 +15,7 @@ See [`DATA.md`](DATA.md) for the datasets and their columns.
 | `baseline.py` | Non-neural references (mean predictor, linear regression, random forest) on the same features/split, so the network has something to beat. |
 | `predict.py` | Loads a saved bundle and prices a single flat from CLI feature values. |
 | `chat.py` | Conversational front-end: Claude asks you for the five features, then calls the saved model and tells you the price. See [Chat estimator](#chat-estimator-chatpy). |
+| `export_web.py` | Exports a saved bundle to `../docs/model.json` for the browser demo (weights + scaler + price band, no TensorFlow.js runtime). |
 | `dataset.py` / `metrics.py` | Shared dataset loading and regression scoring. |
 | `notebook.ipynb` | Exploratory notebook mirroring `model.py`. |
 
