@@ -18,7 +18,7 @@ import sys
 
 import google.generativeai as genai
 
-from tools import TOOLS, VALID_DISTRICTS
+from webapp.tools import TOOLS, VALID_DISTRICTS
 
 MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite")
 MAX_STEPS = 6

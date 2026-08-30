@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from pricing import predict_price
+from webapp.pricing import predict_price
 
 MODEL_JSON = Path(__file__).resolve().parents[1] / "docs" / "model.json"
 

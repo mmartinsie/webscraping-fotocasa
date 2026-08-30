@@ -19,8 +19,8 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 
-from dataset import FEATURES, LEAKY_FEATURE, TARGET, read_csv
-from metrics import format_row, score
+from keras_neural_network.dataset import FEATURES, LEAKY_FEATURE, TARGET, read_csv
+from keras_neural_network.metrics import format_row, score
 
 RANDOM_SEED = 42
 

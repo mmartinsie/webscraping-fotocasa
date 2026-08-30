@@ -1,7 +1,14 @@
 import pandas as pd
 import pytest
 
-from dataset import FEATURES, DatasetError, feature_medians, load_xy, one_hot_district, read_csv
+from keras_neural_network.dataset import (
+    FEATURES,
+    DatasetError,
+    feature_medians,
+    load_xy,
+    one_hot_district,
+    read_csv,
+)
 
 
 def _write(tmp_path, rows, encoding="utf-8"):

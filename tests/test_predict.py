@@ -1,6 +1,13 @@
 import pytest
 
-from predict import BundleError, collect_flat, feature_vector, load_bundle, parse_args, resolve_numeric
+from keras_neural_network.predict import (
+    BundleError,
+    collect_flat,
+    feature_vector,
+    load_bundle,
+    parse_args,
+    resolve_numeric,
+)
 
 METADATA = {
     "numeric_features": ["Habitaciones", "Aseos", "Superficie"],

@@ -1,7 +1,7 @@
 import pytest
-from main import district_from_label, load_scraped_urls
 
-from home import Home
+from webscraping.home import Home
+from webscraping.main import district_from_label, load_scraped_urls
 
 
 @pytest.mark.parametrize(

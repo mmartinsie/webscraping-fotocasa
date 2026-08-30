@@ -1,4 +1,24 @@
-# Tooling config only - this repo is a set of scripts, not an installable package.
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "webscraping-fotocasa"
+version = "0.1.0"
+description = "Scrape Fotocasa listings and estimate Madrid flat prices (Master's thesis)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+# Runtime deps live in the per-area requirements.txt files (webscraping/,
+# keras_neural_network/, webapp/, and the root one for the Streamlit deploy).
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["ruff", "pytest"]
+
+[tool.setuptools]
+packages = ["webscraping", "keras_neural_network", "webapp"]
+py-modules = ["prepare_dataset"]
 
 [tool.ruff]
 line-length = 110
@@ -8,17 +28,7 @@ target-version = "py39"
 select = ["E", "F", "I", "UP", "B", "SIM", "W"]
 
 [tool.ruff.lint.isort]
-known-first-party = [
-    "chat",
-    "dataset",
-    "metrics",
-    "home",
-    "listing",
-    "predict",
-    "prepare_dataset",
-    "pricing",
-    "tools",
-]
+known-first-party = ["webscraping", "keras_neural_network", "webapp", "prepare_dataset"]
 
 [tool.ruff.lint.per-file-ignores]
 # Obsolete from-scratch network: kept as-is on purpose.
@@ -28,4 +38,3 @@ known-first-party = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = [".", "webscraping", "keras_neural_network", "webapp"]

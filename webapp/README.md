@@ -44,14 +44,15 @@ a key of their own.
 
 4. Deploy. It redeploys automatically on every push.
 
-Streamlit Cloud only installs from a `requirements.txt` at the **repo root**
-(this repo has one that mirrors `webapp/requirements.txt`); without it the app
-fails with an `ImportError` on `numpy` / `google-generativeai`.
+Streamlit Cloud only installs from a `requirements.txt` at the **repo root**.
+This repo has one that installs the package (`.`, so `import webapp...` resolves)
+plus `streamlit` / `google-generativeai` / `numpy`; without it the app fails with
+an `ImportError`.
 
 ## Run locally
 
 ```bash
-pip install -r webapp/requirements.txt
+pip install -e . -r webapp/requirements.txt
 GEMINI_API_KEY=AIza... streamlit run webapp/streamlit_app.py
 ```
 

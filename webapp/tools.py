@@ -9,7 +9,7 @@ the model can recover and re-ask instead of getting a silent wrong answer.
 
 from __future__ import annotations
 
-from pricing import (
+from webapp.pricing import (
     district_schools,
     estimate_by_district,
     load_district_schools,

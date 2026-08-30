@@ -2,7 +2,7 @@ import inspect
 
 import pytest
 
-from tools import TOOLS, VALID_DISTRICTS, compare_districts, estimate_price
+from webapp.tools import TOOLS, VALID_DISTRICTS, compare_districts, estimate_price
 
 
 def test_tools_registered():

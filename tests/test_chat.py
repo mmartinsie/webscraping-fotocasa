@@ -1,4 +1,4 @@
-import chat
+from keras_neural_network import chat
 
 METADATA = {
     "numeric_features": ["Habitaciones", "Aseos", "Parking", "Colegios"],
