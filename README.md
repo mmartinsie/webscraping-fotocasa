@@ -56,14 +56,16 @@ flowchart LR
 | --- | ---: | ---: |
 | mean baseline | ~421k € | 0.00 |
 | linear regression | ~204k € | 0.63 |
-| **random forest** | **~170k €** | **0.68** |
-| random forest + one-hot `Distrito` | ~170k € | **0.70** |
-| best neural config (3×24, adam, MAE loss), 3-fold CV | ~193k € | 0.64 |
+| **random forest + one-hot `Distrito`** | **~170k €** | **0.70** |
+| neural net, 5 numeric + one-hot `Distrito`, 3-fold CV | ~200k € | 0.66 |
+| same neural net without district | ~193k € | 0.64 |
 
-A plain random forest beats every neural configuration, and location adds a
-couple of R² points. The thesis data is ~2020, so the demos lead with a
+The one-hot `Distrito` makes the network **location-aware** (its estimate moves
+with the zone) at no cost to the aggregate metrics — but a plain random forest
+still wins. The thesis data is ~2020, so the demos lead with a
 `district €/m² × m²` estimate (~2024-2025 figures) and keep the network's output
-as a secondary reference.
+as a secondary reference. See
+[`keras_neural_network/MODEL_CARD.md`](keras_neural_network/MODEL_CARD.md).
 
 ## Repository layout
 

@@ -5,18 +5,18 @@ mean MAE and reports the best. The winner is then retrained on the whole dataset
 and used to print a recommended price; ``--save DIR`` persists it for
 ``predict.py``.
 
-    python recommend_price.py [dataset.csv] [--folds 3] [--epochs N] [--save model_dir]
+    python recommend_price.py [dataset.csv] [--folds 3] [--with-district] [--save DIR]
 
 Preprocessing:
-- Features are standardized (``StandardScaler``), fit on the training fold only.
-- Missing values are filled with the column median (see ``dataset.load_xy``).
-- The target ``Precio`` is trained on its raw EUR scale. Predictions are clipped
-  to a sane range (half the min .. 1.5x the max training price) so a diverging
-  network cannot report absurd millions.
+- Numeric features are standardized (``StandardScaler``, fit on the training
+  fold). Missing values are filled with the column median (``dataset.load_xy``).
+- ``--with-district`` one-hot-encodes ``Distrito`` and appends it, so the network
+  can actually learn location. The category order is saved for inference.
+- The target ``Precio`` is trained on its raw EUR scale; predictions are clipped
+  to ``[0.5·min, 1.5·max]`` of the training prices.
 
-By default ``Precio_m2`` is excluded: ``precio == precio_m2 * superficie`` almost
-exactly, so keeping it leaks the target and inflates the scores. Pass
-``--keep-precio-m2`` to reproduce the leaky setup used by ``model.py``.
+``Precio_m2`` is excluded by default (it leaks the target); ``--keep-precio-m2``
+reproduces the leaky setup used by ``model.py``.
 """
 
 from __future__ import annotations
@@ -36,7 +36,14 @@ from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 
 from dataset import FEATURES as DEFAULT_FEATURES
-from dataset import LEAKY_FEATURE, TARGET, DatasetError, feature_medians, load_xy
+from dataset import (
+    LEAKY_FEATURE,
+    TARGET,
+    DatasetError,
+    feature_medians,
+    load_xy,
+    one_hot_district,
+)
 from metrics import format_row, score
 
 RANDOM_SEED = 42
@@ -98,14 +105,34 @@ def _band(y: np.ndarray) -> tuple[float, float]:
     return float(y.min()) * 0.5, float(y.max()) * 1.5
 
 
+def fit_scaler(X: np.ndarray, n_numeric: int) -> StandardScaler:
+    """Standardize the numeric columns; leave one-hot columns (index >= n_numeric)
+    untouched. The passthrough is baked into ``mean_``/``scale_`` so
+    ``scaler.transform`` still takes the full-width matrix."""
+    scaler = StandardScaler().fit(X[:, :n_numeric])
+    pad = X.shape[1] - n_numeric
+    scaler.mean_ = np.concatenate([scaler.mean_, np.zeros(pad)])
+    scaler.scale_ = np.concatenate([scaler.scale_, np.ones(pad)])
+    scaler.var_ = np.concatenate([scaler.var_, np.ones(pad)])
+    scaler.n_features_in_ = X.shape[1]
+    return scaler
+
+
 def cross_validate(
-    cfg: Config, X: np.ndarray, y: np.ndarray, folds: int, epochs: int, batch_size: int, seed: int
+    cfg: Config,
+    X: np.ndarray,
+    y: np.ndarray,
+    n_numeric: int,
+    folds: int,
+    epochs: int,
+    batch_size: int,
+    seed: int,
 ) -> dict[str, float]:
     """Mean MAE/RMSE/R2/MAPE of ``cfg`` over a ``folds``-way CV."""
     kfold = KFold(n_splits=folds, shuffle=True, random_state=seed)
     fold_scores = []
     for train_idx, test_idx in kfold.split(X):
-        scaler = StandardScaler().fit(X[train_idx])
+        scaler = fit_scaler(X[train_idx], n_numeric)
         model = train(cfg, scaler.transform(X[train_idx]), y[train_idx], epochs, batch_size)
         lo, hi = _band(y[train_idx])
         pred = np.clip(model.predict(scaler.transform(X[test_idx]), verbose=0).ravel(), lo, hi)
@@ -117,7 +144,8 @@ def save_bundle(
     directory: str,
     model: Sequential,
     scaler: StandardScaler,
-    features: list[str],
+    numeric_features: list[str],
+    district_categories: list[str],
     band: tuple[float, float],
     cfg: Config,
     cv_metrics: dict[str, float],
@@ -128,7 +156,8 @@ def save_bundle(
     model.save(os.path.join(directory, "model.keras"))
     joblib.dump(scaler, os.path.join(directory, "scaler.joblib"))
     metadata = {
-        "features": features,
+        "numeric_features": numeric_features,
+        "district_categories": district_categories,
         "target": TARGET,
         "feature_medians": medians,
         "price_band": {"low": band[0], "high": band[1]},
@@ -148,6 +177,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=DEFAULT_EPOCHS)
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     parser.add_argument("--seed", type=int, default=RANDOM_SEED)
+    parser.add_argument("--with-district", action="store_true", help="one-hot encode Distrito and append it")
     parser.add_argument(
         "--keep-precio-m2",
         action="store_true",
@@ -164,20 +194,26 @@ def main(argv: list[str] | None = None) -> int:
     if not os.path.exists(args.dataset):
         raise SystemExit(f"Dataset not found: {args.dataset}")
 
-    features = ([LEAKY_FEATURE] if args.keep_precio_m2 else []) + DEFAULT_FEATURES
+    numeric = ([LEAKY_FEATURE] if args.keep_precio_m2 else []) + DEFAULT_FEATURES
     set_seeds(args.seed)
     try:
-        X, y = load_xy(args.dataset, features)
+        X, y = load_xy(args.dataset, numeric)
+        categories: list[str] = []
+        if args.with_district:
+            dummies, categories = one_hot_district(args.dataset)
+            X = np.hstack([X, dummies])
     except DatasetError as exc:
         raise SystemExit(str(exc)) from exc
 
-    print(f"Dataset: {args.dataset}  |  samples: {len(X)}  |  features: {features}")
+    n_numeric = len(numeric)
+    label = f"{numeric} + {len(categories)} district dummies" if categories else numeric
+    print(f"Dataset: {args.dataset}  |  samples: {len(X)}  |  features: {label}")
     print(f"{args.folds}-fold CV, up to {args.epochs} epochs per fold\n")
 
     results = []
     for cfg in CONFIGURATIONS:
         print(f"Cross-validating  {cfg.name} ...")
-        metrics = cross_validate(cfg, X, y, args.folds, args.epochs, args.batch_size, args.seed)
+        metrics = cross_validate(cfg, X, y, n_numeric, args.folds, args.epochs, args.batch_size, args.seed)
         results.append((cfg, metrics))
         print("   " + format_row(cfg.name, metrics))
 
@@ -198,24 +234,38 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     print("\nRetraining the winner on the full dataset ...")
-    full_scaler = StandardScaler().fit(X)
+    full_scaler = fit_scaler(X, n_numeric)
     final_model = train(best_cfg, full_scaler.transform(X), y, args.epochs, args.batch_size)
     lo, hi = _band(y)
+    medians = feature_medians(args.dataset, numeric)
 
-    def recommend_price(flat: dict[str, float]) -> float:
-        row = np.array([[flat[f] for f in features]], dtype="float32")
-        pred = final_model.predict(full_scaler.transform(row), verbose=0).ravel()[0]
+    def recommend_price(district: str | None) -> float:
+        row = [medians[f] for f in numeric]
+        row += [1.0 if district == c else 0.0 for c in categories]
+        pred = final_model.predict(full_scaler.transform([row]), verbose=0).ravel()[0]
         return float(np.clip(pred, lo, hi))
 
-    sample = {f: float(np.median(X[:, i])) for i, f in enumerate(features)}
-    print("\nSample flat (dataset medians):")
-    for f in features:
-        print(f"   {f:<12} {sample[f]:g}")
-    print(f"\n>>> Recommended price: {recommend_price(sample):,.0f} EUR")
+    print("\nSample flat (median numeric features):")
+    for f in numeric:
+        print(f"   {f:<12} {medians[f]:g}")
+    if categories:
+        for name in ("Salamanca", "Villaverde"):
+            print(f">>> Recommended price in {name}: {recommend_price(name):,.0f} EUR")
+    else:
+        print(f"\n>>> Recommended price: {recommend_price(None):,.0f} EUR")
 
     if args.save:
-        medians = feature_medians(args.dataset, features)
-        save_bundle(args.save, final_model, full_scaler, features, (lo, hi), best_cfg, best_metrics, medians)
+        save_bundle(
+            args.save,
+            final_model,
+            full_scaler,
+            numeric,
+            categories,
+            (lo, hi),
+            best_cfg,
+            best_metrics,
+            medians,
+        )
     return 0
 
 

@@ -58,8 +58,11 @@ def export(model_dir: str, output: str) -> None:
     band = metadata.get("price_band", {})
     cfg = metadata.get("configuration", {})
     m = metadata.get("cv_metrics") or metadata.get("test_metrics", {})
+    numeric = metadata.get("numeric_features") or metadata.get("features", [])
+    categories = metadata.get("district_categories", [])
     bundle = {
-        "features": metadata["features"],
+        "numeric_features": numeric,
+        "district_categories": categories,
         "feature_medians": metadata.get("feature_medians", {}),
         "scaler": {"mean": scaler.mean_.tolist(), "scale": scaler.scale_.tolist()},
         "band": {"low": band.get("low"), "high": band.get("high")},
@@ -70,10 +73,11 @@ def export(model_dir: str, output: str) -> None:
             "rmse": m.get("rmse"),
             "r2": m.get("r2"),
             "mape": m.get("mape"),
+            "with_district": bool(categories),
             "generated": dt.date.today().isoformat(),
         },
-        # Regression anchor: the Keras prediction for the all-median flat. The
-        # pure-JS / NumPy forward passes must reproduce it (see tests/test_pricing).
+        # Regression anchor: the Keras prediction for the all-median flat with no
+        # district. The pure-JS / NumPy forward passes must reproduce it.
         "_golden_median_price": round(predict_price(model, scaler, metadata, {}), 2),
     }
 
@@ -81,7 +85,7 @@ def export(model_dir: str, output: str) -> None:
     os.makedirs(out_dir, exist_ok=True)
     with open(output, "w", encoding="utf-8") as handle:
         json.dump(bundle, handle, indent=2)
-    print(f"Wrote {output} ({len(layers)} dense layers, {len(bundle['features'])} features)")
+    print(f"Wrote {output} ({len(layers)} layers, {len(numeric)} numeric + {len(categories)} districts)")
     write_districts(out_dir)
 
 

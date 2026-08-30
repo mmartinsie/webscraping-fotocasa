@@ -24,8 +24,9 @@ def model():
 
 
 def test_load_model_shape(model):
-    assert model["features"]
-    assert len(model["scaler"]["mean"]) == len(model["features"])
+    n = len(model["numeric_features"]) + len(model["district_categories"])
+    assert n > 0
+    assert len(model["scaler"]["mean"]) == n
 
 
 def test_predict_within_band(model):

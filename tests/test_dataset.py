@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from dataset import FEATURES, DatasetError, feature_medians, load_xy, read_csv
+from dataset import FEATURES, DatasetError, feature_medians, load_xy, one_hot_district, read_csv
 
 
 def _write(tmp_path, rows, encoding="utf-8"):
@@ -57,3 +57,10 @@ def test_feature_medians(tmp_path):
     med = feature_medians(path, FEATURES)
     assert med["Habitaciones"] == 3.0
     assert set(med) == set(FEATURES)
+
+
+def test_one_hot_district(tmp_path):
+    path = _write(tmp_path, {"Distrito": ["Retiro", "Centro", "Retiro"], "Precio": [1, 2, 3]})
+    matrix, categories = one_hot_district(path)
+    assert categories == ["Centro", "Retiro"]  # sorted
+    assert matrix.tolist() == [[0.0, 1.0], [1.0, 0.0], [0.0, 1.0]]  # row-aligned

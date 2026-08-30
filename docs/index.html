@@ -314,12 +314,15 @@ document.getElementById("form").addEventListener("submit", (ev) => {
 
   const { price: distPrice, eurM2 } = districtEstimate(district, superficie, parking);
   const schools = districtSchools(district);
-  const nnValues = M.features.map((name) => {
+
+  const numeric = M.numeric_features || M.features || [];
+  const nnValues = numeric.map((name) => {
     if (name === "Colegios") return schools;
     const el = document.getElementById(name);
     if (!el) return 0;
     return el.type === "checkbox" ? (el.checked ? 1 : 0) : parseFloat(el.value || "0");
   });
+  for (const cat of M.district_categories || []) nnValues.push(cat === district ? 1 : 0);
   const nnPrice = predict(nnValues);
 
   lastResult = { district, eurM2, parking, distPrice, nnPrice, schools };
@@ -341,7 +344,7 @@ async function init() {
   document.getElementById("submit").disabled = false;
 
   const medians = M.feature_medians || {};
-  for (const name of M.features) {
+  for (const name of M.numeric_features || M.features || []) {
     const el = document.getElementById(name);
     if (el && medians[name] != null) {
       if (el.type === "checkbox") el.checked = Math.round(medians[name]) === 1;

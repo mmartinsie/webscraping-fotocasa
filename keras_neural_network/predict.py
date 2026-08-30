@@ -3,10 +3,12 @@
 Uses a directory produced by ``recommend_price.py --save DIR`` (``model.keras``,
 ``scaler.joblib``, ``metadata.json``).
 
-    python predict.py model_dir --set Habitaciones=3 --set Superficie=90
-    python predict.py model_dir --json '{"Habitaciones": 3, "Superficie": 90}'
+    python predict.py model_dir --set Superficie=90 --set Habitaciones=3 --set Distrito=Salamanca
+    python predict.py model_dir --json '{"Superficie": 90, "Distrito": "Retiro"}'
 
-Features not provided default to the training median stored in the bundle.
+Numeric features not provided default to the training median in the bundle. If
+the model was trained ``--with-district``, ``Distrito`` is one-hot encoded from
+``metadata["district_categories"]`` (an unknown/missing district -> all zeros).
 """
 
 from __future__ import annotations
@@ -37,15 +39,25 @@ def load_bundle(directory: str):
     return model, scaler, metadata
 
 
-def resolve_features(metadata: dict, given: dict[str, float]) -> dict[str, float]:
-    """Fill in every model feature, defaulting missing ones to the stored median."""
+def numeric_features(metadata: dict) -> list[str]:
+    return metadata.get("numeric_features") or metadata.get("features", [])
+
+
+def resolve_numeric(metadata: dict, given: dict) -> dict[str, float]:
+    """Every numeric feature, defaulting missing ones to the stored median."""
     medians = metadata.get("feature_medians", {})
-    return {name: float(given.get(name, medians.get(name, 0.0))) for name in metadata["features"]}
+    return {name: float(given.get(name, medians.get(name, 0.0))) for name in numeric_features(metadata)}
 
 
-def predict_price(model, scaler, metadata: dict, flat: dict[str, float]) -> float:
-    resolved = resolve_features(metadata, flat)
-    row = np.array([[resolved[name] for name in metadata["features"]]], dtype="float32")
+def feature_vector(metadata: dict, flat: dict) -> list[float]:
+    """Model input: numeric features then the district one-hot (if any)."""
+    row = list(resolve_numeric(metadata, flat).values())
+    row += [1.0 if flat.get("Distrito") == c else 0.0 for c in metadata.get("district_categories", [])]
+    return row
+
+
+def predict_price(model, scaler, metadata: dict, flat: dict) -> float:
+    row = np.array([feature_vector(metadata, flat)], dtype="float32")
     raw = float(model.predict(scaler.transform(row), verbose=0).ravel()[0])
     band = metadata.get("price_band")
     if band:
@@ -67,20 +79,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=[],
         metavar="NAME=VALUE",
         dest="pairs",
-        help="set one feature (repeatable), e.g. --set Superficie=90",
+        help="set one feature (repeatable), e.g. --set Superficie=90 or --set Distrito=Retiro",
     )
     return parser.parse_args(argv)
 
 
-def collect_flat(args: argparse.Namespace) -> dict[str, float]:
-    flat: dict[str, float] = {}
+def collect_flat(args: argparse.Namespace) -> dict:
+    flat: dict = {}
     if args.json:
         flat.update(json.loads(args.json))
     for item in args.pairs:
         name, sep, value = item.partition("=")
         if not sep:
             raise SystemExit(f"--set expects NAME=VALUE, got {item!r}")
-        flat[name] = float(value)
+        try:
+            flat[name] = float(value)
+        except ValueError:
+            flat[name] = value  # e.g. Distrito=Salamanca
     return flat
 
 
@@ -92,7 +107,9 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(str(exc)) from exc
 
     flat = collect_flat(args)
-    used = resolve_features(metadata, flat)
+    used = resolve_numeric(metadata, flat)
+    if metadata.get("district_categories"):
+        used["Distrito"] = flat.get("Distrito", "(none)")
     price = predict_price(model, scaler, metadata, flat)
     print(f"Features: {used}")
     print(f"Predicted price: {price:,.0f} EUR")

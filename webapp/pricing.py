@@ -91,11 +91,18 @@ def load_model(path: str | Path = DEFAULT_MODEL_JSON) -> dict:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def predict_price(model: dict, features: dict[str, float]) -> float:
-    """Estimate a flat's price. Missing features fall back to the stored median."""
-    names = model["features"]
+def feature_vector(model: dict, features: dict) -> list[float]:
+    """Model input: numeric features (median-filled) then the district one-hot."""
+    names = model.get("numeric_features") or model.get("features", [])
     medians = model.get("feature_medians", {})
-    x = np.array([float(features.get(name, medians.get(name, 0.0))) for name in names], dtype="float64")
+    row = [float(features.get(n, medians.get(n, 0.0))) for n in names]
+    row += [1.0 if features.get("Distrito") == c else 0.0 for c in model.get("district_categories", [])]
+    return row
+
+
+def predict_price(model: dict, features: dict) -> float:
+    """Estimate a flat's price with the thesis network."""
+    x = np.asarray(feature_vector(model, features), dtype="float64")
     mean = np.asarray(model["scaler"]["mean"], dtype="float64")
     scale = np.asarray(model["scaler"]["scale"], dtype="float64")
     v = (x - mean) / scale

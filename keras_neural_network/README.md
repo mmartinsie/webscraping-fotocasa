@@ -32,6 +32,12 @@ Missing numeric values are filled with the **column median** (`dataset.load_xy`)
 the medians are saved in the bundle so `predict.py` / `chat.py` use them as
 defaults for anything you don't provide.
 
+`recommend_price.py --with-district` one-hot encodes `Distrito` (21 columns) and
+appends it, so the network can actually learn location. The saved bundle records
+`district_categories` (the column order) and `predict.py` / `webapp` / the browser
+rebuild the one-hot from the chosen district. The deployed demo model is trained
+this way.
+
 ## Model recommender (`recommend_price.py`)
 
 1. **Load** – `dataset.load_xy` selects the feature columns by name (so a CSV with
@@ -52,13 +58,13 @@ defaults for anything you don't provide.
    | `3x24 / rmsprop / mse` | 24, 24, 24 | rmsprop | mse |
 
 3. **Recommend / save** – retrains the winner on the full dataset (same inner
-   validation split + early stopping), prints the price for a sample flat
-   (dataset medians) and, with `--save DIR`, writes `model.keras`,
-   `scaler.joblib` and `metadata.json` (features, medians, price band, CV
-   metrics) for `predict.py`.
+   validation split + early stopping), prints the price for a sample flat and,
+   with `--save DIR`, writes `model.keras`, `scaler.joblib` and `metadata.json`
+   (`numeric_features`, `district_categories`, medians, price band, CV metrics)
+   for `predict.py`.
 
 Tune from the CLI (`--folds`, `--epochs`, `--batch-size`, `--seed`,
-`--keep-precio-m2`, `--save`) or by editing `CONFIGURATIONS`.
+`--with-district`, `--keep-precio-m2`, `--save`) or by editing `CONFIGURATIONS`.
 
 ## Requirements
 

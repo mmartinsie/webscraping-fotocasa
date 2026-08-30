@@ -37,6 +37,7 @@ def estimate_price(district: str, rooms: int, bathrooms: int, area_m2: float, pa
     nn_price = predict_price(
         _MODEL,
         {
+            "Distrito": by_district["distrito"],
             "Habitaciones": rooms,
             "Aseos": bathrooms,
             "Superficie": area_m2,

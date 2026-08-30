@@ -49,7 +49,8 @@ Leading unnamed column = pandas row index. Then:
 | `Precio_m2` | int (EUR/m²) | `Precio / Superficie`. **Leaks the target** — excluded by `recommend_price.py` / `baseline.py` by default, kept by `model.py`. |
 | `Habitaciones`, `Aseos`, `Superficie`, `Parking` | int | As above. |
 | `Colegios` | int | Number of schools near the property (external data). |
-| `Tipo`, `Distrito` | str | Dropped by every model script before training. |
+| `Tipo` | str | Dropped by every model script before training. |
+| `Distrito` | str | Dropped by `model.py` / `select_model.py`; `recommend_price.py --with-district` one-hot encodes it. |
 
 Model scripts (`dataset.load_xy`) fill any missing numeric value with that
 column's median.

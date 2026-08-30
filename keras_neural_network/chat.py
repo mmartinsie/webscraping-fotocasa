@@ -36,21 +36,31 @@ the predict_price tool exactly once. Report the returned figure in euros and mak
 clear it is a rough model estimate, not a professional appraisal."""
 
 
-def build_tool(features: list[str]) -> dict:
-    """A predict_price tool whose schema mirrors the model's feature list."""
+def _numeric_features(metadata: dict) -> list[str]:
+    return metadata.get("numeric_features") or metadata.get("features", [])
+
+
+def build_tool(metadata: dict) -> dict:
+    """A predict_price tool whose schema mirrors the model's inputs."""
+    numeric = _numeric_features(metadata)
     properties = {}
-    for name in features:
+    for name in numeric:
         if name.lower() in ("parking", "garaje"):
             properties[name] = {"type": "integer", "enum": [0, 1]}
         else:
             properties[name] = {"type": "number"}
+    required = list(numeric)
+    categories = metadata.get("district_categories")
+    if categories:
+        properties["Distrito"] = {"type": "string", "enum": categories}
+        required.append("Distrito")
     return {
         "name": "predict_price",
         "description": "Estimate the flat's sale price once the features are known.",
         "input_schema": {
             "type": "object",
             "properties": properties,
-            "required": features,
+            "required": required,
             "additionalProperties": False,
         },
     }
@@ -58,15 +68,17 @@ def build_tool(features: list[str]) -> dict:
 
 def build_system(metadata: dict) -> str:
     medians = metadata.get("feature_medians", {})
-    lines = "\n".join(f"- {name} (median {medians.get(name, 'n/a')})" for name in metadata["features"])
-    return SYSTEM_TEMPLATE.format(feature_lines=lines)
+    lines = [f"- {name} (median {medians.get(name, 'n/a')})" for name in _numeric_features(metadata)]
+    if metadata.get("district_categories"):
+        lines.append("- Distrito (one of the Madrid districts)")
+    return SYSTEM_TEMPLATE.format(feature_lines="\n".join(lines))
 
 
 def run_tool(bundle: tuple, tool_input: dict) -> dict:
     try:
         model, scaler, metadata = bundle
-        price = predict_price(model, scaler, metadata, {k: float(v) for k, v in tool_input.items()})
-        return {"price_eur": round(price)}
+        flat = {k: (v if k == "Distrito" else float(v)) for k, v in tool_input.items()}
+        return {"price_eur": round(predict_price(model, scaler, metadata, flat))}
     except Exception as exc:  # surface the failure to Claude instead of crashing
         return {"error": f"{type(exc).__name__}: {exc}"}
 
@@ -93,7 +105,7 @@ def main(argv: list[str] | None = None) -> int:
 
     import anthropic
 
-    tool = build_tool(metadata["features"])
+    tool = build_tool(metadata)
     system = build_system(metadata)
     client = anthropic.Anthropic()
     messages: list[dict] = []
