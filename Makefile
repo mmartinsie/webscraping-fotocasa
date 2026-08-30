@@ -1,11 +1,7 @@
 # Convenience targets. Use `py` on Windows if `python` opens the Store stub.
 PYTHON ?= python
 
-.PHONY: setup lint test check demo-model dataset app
-
-# One-time: editable install so `import webscraping/keras_neural_network/webapp` works.
-setup:
-	$(PYTHON) -m pip install -e ".[dev]"
+.PHONY: lint test check demo-model dataset app
 
 lint:
 	ruff check .
@@ -15,7 +11,7 @@ test:
 	pytest -q
 
 check: lint test
-	$(PYTHON) -m compileall -q webscraping neural_network keras_neural_network webapp prepare_dataset.py
+	$(PYTHON) -m compileall -q webscraping neural_network keras_neural_network prepare_dataset.py
 
 # Rebuild the browser demo's model (docs/model.json) from the current code.
 demo-model:

@@ -19,7 +19,7 @@ import numpy as np
 from keras.layers import Dense, Input
 from keras.models import Sequential
 
-from keras_neural_network.dataset import FEATURES, LEAKY_FEATURE, DatasetError, load_xy
+from dataset import FEATURES, LEAKY_FEATURE, DatasetError, load_xy
 
 RANDOM_SEED = 42
 

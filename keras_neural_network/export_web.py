@@ -16,7 +16,7 @@ import datetime as dt
 import json
 import os
 
-from keras_neural_network.predict import load_bundle, predict_price
+from predict import load_bundle, predict_price
 
 _DATA = os.path.join(os.path.dirname(__file__), "..", "data")
 DISTRICT_CSV = os.path.join(_DATA, "precio_m2_distrito.csv")

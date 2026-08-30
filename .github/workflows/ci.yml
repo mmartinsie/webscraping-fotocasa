@@ -18,10 +18,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install the package and light deps
+      - name: Install tooling and light deps
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]" beautifulsoup4 lxml numpy pandas scikit-learn selenium requests
+          pip install ruff pytest beautifulsoup4 lxml numpy pandas scikit-learn selenium requests
 
       - name: Ruff (lint + format check)
         run: |

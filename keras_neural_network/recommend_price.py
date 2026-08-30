@@ -35,8 +35,8 @@ from keras.models import Sequential
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 
-from keras_neural_network.dataset import FEATURES as DEFAULT_FEATURES
-from keras_neural_network.dataset import (
+from dataset import FEATURES as DEFAULT_FEATURES
+from dataset import (
     LEAKY_FEATURE,
     TARGET,
     DatasetError,
@@ -44,7 +44,7 @@ from keras_neural_network.dataset import (
     load_xy,
     one_hot_district,
 )
-from keras_neural_network.metrics import format_row, score
+from metrics import format_row, score
 
 RANDOM_SEED = 42
 DEFAULT_EPOCHS = 200

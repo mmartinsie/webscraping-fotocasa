@@ -69,8 +69,7 @@ Tune from the CLI (`--folds`, `--epochs`, `--batch-size`, `--seed`,
 ## Requirements
 
 - Python 3.9+
-- From the repo root: `pip install -e .` (makes `import keras_neural_network...`
-  work) then `pip install -r keras_neural_network/requirements.txt`
+- `pip install -r requirements.txt`
 
   `pandas` and `matplotlib` must be builds compatible with the installed `numpy`
   (a `numpy` 2.x / `pandas` 1.3 mix raises `numpy.dtype size changed`; an old
@@ -80,7 +79,7 @@ Tune from the CLI (`--folds`, `--epochs`, `--batch-size`, `--seed`,
 ## Usage
 
 ```bash
-cd keras_neural_network   # so the scripts find finalDataset3.csv
+cd keras_neural_network
 
 python baseline.py --with-district             # non-neural reference numbers
 python model.py --epochs 150                   # train the thesis model
@@ -91,9 +90,7 @@ python predict.py model_dir --set Superficie=90 --set Distrito=Retiro
 
 On Windows, if `python` opens the Microsoft Store, use the launcher: `py model.py`.
 
-Imports are package-qualified (`from keras_neural_network.dataset import …`), so
-`pip install -e .` is what makes the scripts runnable — the `cd` is only so they
-find `finalDataset3.csv` (or pass `--dataset`).
+Every script reads `finalDataset3.csv` from the current directory by default;
 pass another file with `--dataset` (`model.py`, `select_model.py`) or as the
 first positional argument (`recommend_price.py`, `baseline.py`).
 

@@ -34,8 +34,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from urllib3.util.retry import Retry
 
-from webscraping.home import CSV_HEADERS, Home
-from webscraping.listing import scrape_listing
+from home import CSV_HEADERS, Home
+from listing import scrape_listing
 
 logger = logging.getLogger("fotocasa.scraper")
 

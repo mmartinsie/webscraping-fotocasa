@@ -17,7 +17,7 @@ import argparse
 import json
 import os
 
-from keras_neural_network.predict import BundleError, load_bundle, predict_price
+from predict import BundleError, load_bundle, predict_price
 
 DEFAULT_MODEL = "claude-opus-5"
 MAX_TOKENS = 16000

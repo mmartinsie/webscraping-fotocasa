@@ -28,7 +28,7 @@ import time
 import google.generativeai as genai
 import streamlit as st
 
-from webapp.tools import TOOLS, VALID_DISTRICTS, estimate_price
+from tools import TOOLS, VALID_DISTRICTS, estimate_price
 
 # gemini-*-lite models get the most generous free-tier request quota, which
 # matters here: automatic function calling makes 2-3 API calls per user turn.

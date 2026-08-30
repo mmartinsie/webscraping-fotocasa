@@ -1,7 +1,7 @@
 from bs4 import BeautifulSoup
 
-from webscraping.home import Home
-from webscraping.listing import _parse_characteristics, _parse_header_features, _parse_price
+from home import Home
+from listing import _parse_characteristics, _parse_header_features, _parse_price
 
 PRICE_HTML = '<span class="re-DetailHeader-price">234.000 &euro;</span>'
 

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from webapp.pricing import (
+from pricing import (
     district_eur_m2,
     district_schools,
     estimate_by_district,

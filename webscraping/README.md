@@ -17,17 +17,17 @@ file (`buildings_information.csv`).
 - Python 3.9+
 - [Firefox](https://www.mozilla.org/firefox/) and
   [geckodriver](https://github.com/mozilla/geckodriver/releases) on `PATH`
-- Python packages (from the repo root):
+- Python packages:
 
   ```bash
-  pip install -e .                       # makes `import webscraping...` work
-  pip install -r webscraping/requirements.txt
+  pip install -r requirements.txt
   ```
 
 ## Usage
 
 ```bash
-python webscraping/main.py --pages 5 --output buildings_information.csv
+cd webscraping
+python main.py --pages 5 --output buildings_information.csv
 ```
 
 Point the scraper at geckodriver with `--geckodriver PATH` or the

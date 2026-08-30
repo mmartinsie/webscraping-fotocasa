@@ -31,9 +31,8 @@ Madrid"* and since refactored into a small, tested codebase.
   static page, the CLI, and the agent tool.
 - **LLM agent** — multi-tool function-calling loop (SDK-driven and a hand-written
   variant), made visible in the UI, with token/latency instrumentation.
-- **Engineering hygiene** — installable package (`pip install -e .`, three
-  sub-packages), 60+ tests, `ruff`, CI on Python 3.9/3.11/3.12, type hints,
-  `make check`.
+- **Engineering hygiene** — 50+ tests, `ruff`, CI on Python 3.9/3.11/3.12,
+  type hints, `make check`.
 
 ## Architecture
 
@@ -84,20 +83,20 @@ as a secondary reference. See
 ## Quickstart
 
 ```bash
-pip install -e ".[dev]"          # once — makes the three sub-packages importable
-make check                       # ruff + pytest + compile
-
 # scrape (needs Firefox + geckodriver)
-pip install -r webscraping/requirements.txt
-python webscraping/main.py --pages 5 --output buildings_information.csv
+cd webscraping && pip install -r requirements.txt
+python main.py --pages 5 --output buildings_information.csv
 
 # clean the raw CSV (join a schools-per-district table for the Colegios column)
-python prepare_dataset.py buildings_information.csv -o dataset.csv
+python prepare_dataset.py webscraping/buildings_information.csv -o dataset.csv
 
 # train + save a model bundle (uses the committed dataset by default)
-pip install -r keras_neural_network/requirements.txt
-python keras_neural_network/recommend_price.py --with-district --save web_model
-python keras_neural_network/predict.py web_model --set Superficie=90 --set Distrito=Retiro
+cd keras_neural_network && pip install -r requirements.txt
+python recommend_price.py --save web_model
+python predict.py web_model --set Superficie=90 --set Habitaciones=3
+
+# checks
+make check        # ruff + pytest + compile
 ```
 
 The static page is served straight from `docs/` (GitHub Pages → "Deploy from a

@@ -1,6 +1,6 @@
 import numpy as np
 
-from keras_neural_network.metrics import format_row, score
+from metrics import format_row, score
 
 
 def test_score_perfect_prediction():

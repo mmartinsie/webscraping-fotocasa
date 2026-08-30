@@ -18,7 +18,7 @@ from keras.models import Sequential
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import KFold
 
-from keras_neural_network.dataset import FEATURES, LEAKY_FEATURE, DatasetError, load_xy
+from dataset import FEATURES, LEAKY_FEATURE, DatasetError, load_xy
 
 RANDOM_SEED = 42
 MODEL_FEATURES = [LEAKY_FEATURE, *FEATURES]

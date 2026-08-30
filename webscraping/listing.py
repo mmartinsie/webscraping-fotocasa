@@ -13,7 +13,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
-from webscraping.home import Home
+from home import Home
 
 logger = logging.getLogger(__name__)
 
