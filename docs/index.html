@@ -8,128 +8,172 @@
 <style>
   :root {
     color-scheme: light dark;
-    --bg: #f6f7f9;
+    --bg: #eef1f6;
     --surface: #ffffff;
-    --surface-2: #f1f3f5;
-    --fg: #1c1e21;
-    --muted: #6b7280;
-    --border: #e3e6ea;
+    --surface-2: #f1f3f7;
+    --fg: #14161a;
+    --muted: #656c7a;
+    --border: #e0e4ec;
     --accent: #2f6bff;
-    --accent-weak: #eaf0ff;
+    --accent-2: #6a4bff;
+    --accent-weak: #e9effe;
     --accent-fg: #ffffff;
-    --good: #17b26a;
+    --good: #12a150;
     --danger: #e5484d;
-    --shadow: 0 1px 2px rgba(16,24,40,.04), 0 12px 32px -12px rgba(16,24,40,.12);
-    --radius: 14px;
+    --shadow-sm: 0 1px 2px rgba(16,24,40,.05);
+    --shadow-lg: 0 1px 3px rgba(16,24,40,.05), 0 20px 48px -20px rgba(16,24,40,.22);
+    --radius: 16px;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #0f1115;
-      --surface: #171a20;
-      --surface-2: #1e222a;
-      --fg: #e9eaec;
-      --muted: #9aa1ac;
-      --border: #2a2f3a;
+      --bg: #0c0e12;
+      --surface: #16191f;
+      --surface-2: #1d212a;
+      --fg: #eceef1;
+      --muted: #949cab;
+      --border: #282d38;
       --accent: #5b8bff;
-      --accent-weak: #1b2333;
-      --accent-fg: #0f1115;
-      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 16px 40px -16px rgba(0,0,0,.6);
+      --accent-2: #9a86ff;
+      --accent-weak: #1a2333;
+      --accent-fg: #0c0e12;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+      --shadow-lg: 0 1px 3px rgba(0,0,0,.5), 0 24px 56px -22px rgba(0,0,0,.7);
     }
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    padding: clamp(1.25rem, 4vw, 3rem) 1rem 3rem;
-    background: var(--bg);
+    padding: clamp(1rem, 4vw, 3.5rem) 1rem 3rem;
+    background:
+      radial-gradient(900px 400px at 15% -8%, color-mix(in srgb, var(--accent) 14%, transparent), transparent),
+      radial-gradient(700px 340px at 100% 0%, color-mix(in srgb, var(--accent-2) 12%, transparent), transparent),
+      var(--bg);
+    background-attachment: fixed;
     color: var(--fg);
     font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
-    display: flex;
-    justify-content: center;
   }
-  .wrap { width: 100%; max-width: 480px; }
+  .wrap { width: 100%; max-width: 940px; margin: 0 auto; }
 
-  header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
-  .brand { display: flex; align-items: center; gap: .6rem; }
-  .brand .mark {
-    width: 34px; height: 34px; flex: none; border-radius: 9px;
-    background: var(--accent); color: var(--accent-fg);
-    display: grid; place-items: center; font-size: 1.05rem;
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; margin-bottom: 1.5rem;
   }
-  h1 { font-size: 1.15rem; font-weight: 650; margin: 0; letter-spacing: -.01em; }
-  .subtitle { color: var(--muted); font-size: .82rem; margin: .1rem 0 0; }
+  .brand { display: flex; align-items: center; gap: .7rem; }
+  .brand .mark {
+    width: 40px; height: 40px; flex: none; border-radius: 11px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #fff; display: grid; place-items: center; font-size: 1.2rem;
+    box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--accent) 70%, transparent);
+  }
+  h1 { font-size: 1.2rem; font-weight: 680; margin: 0; letter-spacing: -.015em; }
+  .subtitle { color: var(--muted); font-size: .82rem; margin: .12rem 0 0; }
   .lang {
     flex: none; background: var(--surface); border: 1px solid var(--border);
-    color: var(--muted); border-radius: 999px; padding: .3rem .7rem;
-    font: inherit; font-size: .78rem; font-weight: 600; cursor: pointer;
+    color: var(--muted); border-radius: 999px; padding: .4rem .85rem;
+    font: inherit; font-size: .76rem; font-weight: 700; letter-spacing: .03em; cursor: pointer;
+    box-shadow: var(--shadow-sm); transition: color .12s, border-color .12s;
   }
-  .lang:hover { color: var(--fg); }
+  .lang:hover { color: var(--fg); border-color: var(--muted); }
+
+  .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; align-items: start; }
+  @media (max-width: 760px) { .layout { grid-template-columns: 1fr; } }
 
   .card {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); box-shadow: var(--shadow);
-    padding: clamp(1.1rem, 3.5vw, 1.5rem);
+    border-radius: var(--radius); box-shadow: var(--shadow-lg);
+    padding: clamp(1.15rem, 3.5vw, 1.6rem);
+  }
+  .card > h2 {
+    margin: 0 0 1.1rem; font-size: .74rem; font-weight: 700;
+    letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
   }
 
   form { display: grid; gap: 1rem; }
-  .field { display: grid; gap: .35rem; }
+  .field { display: grid; gap: .4rem; }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
   label { font-weight: 600; font-size: .8rem; color: var(--fg); }
   .hint { font-weight: 400; color: var(--muted); }
   input[type="number"], select {
-    width: 100%; padding: .6rem .7rem;
+    width: 100%; padding: .62rem .72rem;
     border: 1px solid var(--border); border-radius: 10px;
-    background: var(--bg); color: var(--fg); font: inherit;
-    transition: border-color .12s, box-shadow .12s;
+    background: var(--surface-2); color: var(--fg); font: inherit;
+    transition: border-color .12s, box-shadow .12s, background .12s;
   }
   input[type="number"]:focus, select:focus {
-    outline: none; border-color: var(--accent);
+    outline: none; border-color: var(--accent); background: var(--surface);
     box-shadow: 0 0 0 3px var(--accent-weak);
   }
   .check {
     display: flex; align-items: center; gap: .6rem;
-    padding: .55rem .7rem; border: 1px solid var(--border); border-radius: 10px;
-    background: var(--bg); cursor: pointer; user-select: none;
+    padding: .6rem .72rem; border: 1px solid var(--border); border-radius: 10px;
+    background: var(--surface-2); cursor: pointer; user-select: none;
   }
   .check input { width: 1.05rem; height: 1.05rem; accent-color: var(--accent); }
-  .check label { cursor: pointer; }
+  .check span { font-weight: 600; font-size: .8rem; }
+
+  .context {
+    display: flex; flex-wrap: wrap; gap: .4rem; margin-top: -.2rem;
+  }
+  .chip {
+    font-size: .74rem; color: var(--muted);
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 999px; padding: .28rem .6rem;
+  }
+  .chip b { color: var(--fg); font-weight: 650; }
 
   button[type="submit"] {
-    margin-top: .2rem; width: 100%; padding: .8rem; border: 0; border-radius: 10px;
-    background: var(--accent); color: var(--accent-fg);
-    font: inherit; font-size: .95rem; font-weight: 650; cursor: pointer;
+    margin-top: .1rem; width: 100%; padding: .85rem; border: 0; border-radius: 11px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #fff; font: inherit; font-size: .95rem; font-weight: 680; cursor: pointer;
+    box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--accent) 75%, transparent);
     transition: filter .12s, transform .06s;
   }
-  button[type="submit"]:hover:not(:disabled) { filter: brightness(1.05); }
+  button[type="submit"]:hover:not(:disabled) { filter: brightness(1.06); }
   button[type="submit"]:active:not(:disabled) { transform: translateY(1px); }
-  button:disabled { opacity: .55; cursor: default; }
+  button:disabled { opacity: .5; cursor: default; box-shadow: none; }
 
-  .result {
-    margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--border);
+  /* Result panel: always visible, with an empty state before the first run. */
+  #panel { display: flex; flex-direction: column; min-height: 100%; }
+  .empty {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; color: var(--muted); padding: 2rem 1rem; gap: .5rem;
   }
+  .empty .ico {
+    width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center;
+    background: var(--accent-weak); color: var(--accent); font-size: 1.4rem;
+  }
+  .empty p { margin: 0; font-size: .85rem; max-width: 24ch; }
+
   @media (prefers-reduced-motion: no-preference) {
-    .result:not([hidden]) { animation: rise .28s ease both; }
+    .result:not([hidden]) { animation: rise .3s ease both; }
   }
-  @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
-  .result .eyebrow { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-  .price { font-size: 2.1rem; font-weight: 700; letter-spacing: -.02em; margin: .15rem 0 .1rem; font-variant-numeric: tabular-nums; }
-  .range { color: var(--muted); font-size: .85rem; }
-  .breakdown { color: var(--muted); font-size: .82rem; margin-top: .5rem; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+  .eyebrow { font-size: .72rem; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .price {
+    font-size: clamp(2.1rem, 7vw, 2.7rem); font-weight: 750; letter-spacing: -.025em;
+    margin: .2rem 0 .15rem; font-variant-numeric: tabular-nums; line-height: 1.05;
+  }
+  .range { color: var(--muted); font-size: .86rem; }
+  .breakdown { color: var(--muted); font-size: .82rem; margin-top: .6rem; }
 
-  .bars { margin-top: 1rem; display: grid; gap: .55rem; }
-  .bar-row { display: grid; grid-template-columns: 92px 1fr auto; align-items: center; gap: .6rem; font-size: .78rem; }
+  .bars { margin-top: 1.15rem; display: grid; gap: .7rem; }
+  .bar-row { display: grid; grid-template-columns: 96px 1fr auto; align-items: center; gap: .6rem; font-size: .78rem; }
   .bar-row .name { color: var(--muted); }
-  .bar-track { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
-  .bar-fill { height: 100%; border-radius: 999px; background: var(--accent); transition: width .4s cubic-bezier(.2,.7,.2,1); }
+  .bar-track { height: 9px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .45s cubic-bezier(.2,.7,.2,1); }
   .bar-row.ref .bar-fill { background: var(--muted); }
-  .bar-row .val { font-variant-numeric: tabular-nums; color: var(--fg); }
+  .bar-row .val { font-variant-numeric: tabular-nums; color: var(--fg); font-weight: 600; }
 
-  .about, footer { margin-top: 1.1rem; font-size: .76rem; color: var(--muted); line-height: 1.5; }
-  footer { margin-top: 1.25rem; }
-  footer a, .about a { color: var(--accent); text-decoration: none; }
+  .note {
+    margin-top: 1.15rem; padding-top: 1rem; border-top: 1px solid var(--border);
+    font-size: .76rem; color: var(--muted); line-height: 1.5;
+  }
+  footer { margin-top: 1.5rem; text-align: center; font-size: .76rem; color: var(--muted); }
+  footer a, .note a { color: var(--accent); text-decoration: none; }
   footer a:hover { text-decoration: underline; }
   .err { color: var(--danger); }
-  code { background: var(--surface-2); padding: .05rem .3rem; border-radius: 4px; font-size: .9em; }
+  code { background: var(--surface-2); padding: .06rem .32rem; border-radius: 5px; font-size: .9em; }
 </style>
 </head>
 <body>
@@ -145,60 +189,77 @@
     <button type="button" class="lang" id="lang"></button>
   </header>
 
-  <div class="card">
-    <form id="form">
-      <div class="field">
-        <label for="Distrito" data-i18n="lblDistrict"></label>
-        <select id="Distrito"></select>
-      </div>
-
-      <div class="grid-2">
+  <div class="layout">
+    <div class="card">
+      <h2 data-i18n="formHeading"></h2>
+      <form id="form">
         <div class="field">
-          <label for="Habitaciones" data-i18n="lblRooms"></label>
-          <input type="number" id="Habitaciones" min="1" step="1" value="3" required>
+          <label for="Distrito" data-i18n="lblDistrict"></label>
+          <select id="Distrito"></select>
         </div>
-        <div class="field">
-          <label for="Aseos" data-i18n="lblBaths"></label>
-          <input type="number" id="Aseos" min="1" step="1" value="2" required>
-        </div>
-      </div>
 
-      <div class="grid-2">
-        <div class="field">
-          <label for="Superficie" data-i18n-html="lblSize"></label>
-          <input type="number" id="Superficie" min="15" step="1" value="90" required>
+        <div class="context" id="context" hidden>
+          <span class="chip" id="chipEurM2"></span>
+          <span class="chip" id="chipSchools"></span>
         </div>
-        <label class="check" style="align-self:end">
-          <input type="checkbox" id="Parking">
-          <span data-i18n="lblParking"></span>
-        </label>
-      </div>
 
-      <button type="submit" id="submit" disabled></button>
-    </form>
-
-    <div class="result" id="result" hidden>
-      <div class="eyebrow" data-i18n="resultLabel"></div>
-      <div class="price" id="price">—</div>
-      <div class="range" id="range"></div>
-      <div class="breakdown" id="breakdown"></div>
-
-      <div class="bars">
-        <div class="bar-row">
-          <span class="name" data-i18n="barEstimate"></span>
-          <span class="bar-track"><span class="bar-fill" id="barA"></span></span>
-          <span class="val" id="valA"></span>
+        <div class="grid-2">
+          <div class="field">
+            <label for="Habitaciones" data-i18n="lblRooms"></label>
+            <input type="number" id="Habitaciones" min="1" step="1" value="3" required>
+          </div>
+          <div class="field">
+            <label for="Aseos" data-i18n="lblBaths"></label>
+            <input type="number" id="Aseos" min="1" step="1" value="2" required>
+          </div>
         </div>
-        <div class="bar-row ref">
-          <span class="name" data-i18n="barNN"></span>
-          <span class="bar-track"><span class="bar-fill" id="barB"></span></span>
-          <span class="val" id="valB"></span>
+
+        <div class="grid-2">
+          <div class="field">
+            <label for="Superficie" data-i18n-html="lblSize"></label>
+            <input type="number" id="Superficie" min="15" step="1" value="90" required>
+          </div>
+          <label class="check" style="align-self:end">
+            <input type="checkbox" id="Parking">
+            <span data-i18n="lblParking"></span>
+          </label>
         </div>
-      </div>
-      <div class="breakdown" id="nnTag"></div>
+
+        <button type="submit" id="submit" disabled></button>
+      </form>
     </div>
 
-    <p class="about" id="about"></p>
+    <div class="card" id="panel">
+      <h2 data-i18n="resultHeading"></h2>
+
+      <div class="empty" id="emptyState">
+        <div class="ico" aria-hidden="true">📊</div>
+        <p data-i18n="emptyBody"></p>
+      </div>
+
+      <div class="result" id="result" hidden>
+        <div class="eyebrow" data-i18n="resultLabel"></div>
+        <div class="price" id="price">—</div>
+        <div class="range" id="range"></div>
+        <div class="breakdown" id="breakdown"></div>
+
+        <div class="bars">
+          <div class="bar-row">
+            <span class="name" data-i18n="barEstimate"></span>
+            <span class="bar-track"><span class="bar-fill" id="barA"></span></span>
+            <span class="val" id="valA"></span>
+          </div>
+          <div class="bar-row ref">
+            <span class="name" data-i18n="barNN"></span>
+            <span class="bar-track"><span class="bar-fill" id="barB"></span></span>
+            <span class="val" id="valB"></span>
+          </div>
+        </div>
+        <div class="note" id="nnTag"></div>
+      </div>
+
+      <p class="note" id="about"></p>
+    </div>
   </div>
 
   <footer data-i18n-html="footer"></footer>
@@ -210,6 +271,8 @@ const T = {
   en: {
     title: "Madrid flat price estimator",
     subtitle: "Runs entirely in your browser",
+    formHeading: "The flat",
+    resultHeading: "Estimate",
     lblDistrict: "District",
     lblRooms: "Rooms",
     lblBaths: "Bathrooms",
@@ -218,12 +281,15 @@ const T = {
     btnCalc: "Estimate price",
     btnLoading: "Loading…",
     langOther: "ES",
+    chipEurM2: (e) => `${e} €/m² · 2024`,
+    chipSchools: (n) => `${n} schools`,
+    emptyBody: "Fill in the details and get an estimate with a market vs. neural-net comparison.",
     resultLabel: "Estimated price",
     range: (lo, hi) => `likely range ${lo} – ${hi}`,
     breakdown: (m2, e, pk) => `${m2} m² × ${e} €/m²` + (pk ? " · +6% parking" : ""),
     barEstimate: "€/m² · 2024",
     barNN: "Neural net",
-    nnTag: (sc, cfg) => `Reference: thesis network (${cfg}), ~2020 data · ${sc} schools by district`,
+    nnTag: (sc, cfg) => `Reference: thesis network (${cfg}), ~2020 data · ${sc} schools by district.`,
     errTitle: "Could not load the data",
     errBody: 'Open this page from the published site (or serve it with '
       + '<code>python -m http.server</code>): <code>file://</code> cannot load the JSON.',
@@ -233,6 +299,8 @@ const T = {
   es: {
     title: "Tasador de pisos de Madrid",
     subtitle: "Todo corre en tu navegador",
+    formHeading: "El piso",
+    resultHeading: "Estimación",
     lblDistrict: "Distrito",
     lblRooms: "Habitaciones",
     lblBaths: "Aseos",
@@ -241,12 +309,15 @@ const T = {
     btnCalc: "Calcular precio",
     btnLoading: "Cargando…",
     langOther: "EN",
+    chipEurM2: (e) => `${e} €/m² · 2024`,
+    chipSchools: (n) => `${n} colegios`,
+    emptyBody: "Rellena los datos y obtén una estimación con comparación mercado vs. red neuronal.",
     resultLabel: "Precio estimado",
     range: (lo, hi) => `rango probable ${lo} – ${hi}`,
     breakdown: (m2, e, pk) => `${m2} m² × ${e} €/m²` + (pk ? " · +6% parking" : ""),
     barEstimate: "€/m² · 2024",
     barNN: "Red neuronal",
-    nnTag: (sc, cfg) => `Referencia: red del TFM (${cfg}), datos ~2020 · ${sc} colegios por distrito`,
+    nnTag: (sc, cfg) => `Referencia: red del TFM (${cfg}), datos ~2020 · ${sc} colegios por distrito.`,
     errTitle: "No se pudieron cargar los datos",
     errBody: 'Abre esta página desde el sitio publicado (o sírvela con '
       + '<code>python -m http.server</code>): <code>file://</code> no permite cargar los JSON.',
@@ -312,6 +383,15 @@ function renderDistricts() {
   if (current) select.value = current;
 }
 
+function updateContext() {
+  const t = T[lang];
+  const district = $("Distrito").value;
+  if (!D || !district) { $("context").hidden = true; return; }
+  $("chipEurM2").innerHTML = t.chipEurM2(`<b>${fmt(districtEurM2(district))}</b>`);
+  $("chipSchools").innerHTML = t.chipSchools(`<b>${districtSchools(district)}</b>`);
+  $("context").hidden = false;
+}
+
 function compute() {
   if (!M || !D) return;
   const district = $("Distrito").value;
@@ -331,6 +411,7 @@ function compute() {
   for (const cat of M.district_categories || []) values.push(cat === district ? 1 : 0);
 
   lastResult = { eurM2, superficie, parking, schools, distPrice, nnPrice: predict(values) };
+  $("emptyState").hidden = true;
   $("result").hidden = false;
   paint();
 }
@@ -369,6 +450,7 @@ function render() {
   submit.textContent = M ? t.btnCalc : t.btnLoading;
   if (M) about.textContent = t.about(M.meta && M.meta.mae != null ? eur(M.meta.mae) : "n/a");
   renderDistricts();
+  updateContext();
   paint();
 }
 
@@ -378,7 +460,7 @@ $("lang").addEventListener("click", () => {
   render();
 });
 $("form").addEventListener("submit", (ev) => { ev.preventDefault(); compute(); });
-$("form").addEventListener("input", () => { if (lastResult) compute(); });
+$("form").addEventListener("input", () => { updateContext(); if (lastResult) compute(); });
 
 async function init() {
   try {
