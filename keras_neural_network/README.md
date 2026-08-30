@@ -3,7 +3,9 @@
 Final implementation of the model that predicts the sale price of a Madrid
 property from its characteristics, built with [Keras](https://keras.io/).
 
-See [`DATA.md`](DATA.md) for the datasets and their columns.
+See [`DATA.md`](DATA.md) for the datasets and their columns, and
+[`MODEL_CARD.md`](MODEL_CARD.md) for the trained model's intended use, metrics
+and limitations.
 
 ## Contents
 

@@ -1,38 +1,55 @@
-# Web Scraping Fotocasa
+# Madrid Flat Price Estimator
 
-This repository contains all the scripts developed for the Master's thesis
-*"Categorization of real-estate properties in the city of Madrid"*. It is made up
-of two parts: on one side, the scraping of information from the Fotocasa website
-and, on the other side, the neural network that predicts the price of a property
-based on its characteristics.
+End-to-end data project: **scrape** property listings from Fotocasa, **clean**
+them into a dataset, **train and honestly evaluate** price-prediction models, and
+ship **two front-ends** — a zero-backend static page and an LLM agent. Built for
+the Master's thesis *"Categorization of real-estate properties in the city of
+Madrid"* and since refactored into a small, tested codebase.
 
-**[Live demo](https://mmartinsie.github.io/webscraping-fotocasa/)** — a static
-page (in `docs/`, EN/ES) that estimates a price from the district's €/m²
-([`data/precio_m2_distrito.csv`](data/README.md), ~2024) and shows the thesis
-neural network's number (~2020 data) as a reference, all in the browser.
-An LLM-agent version (Gemini function calling + Streamlit, EN/ES, with a form
-fallback) lives in [`webapp/`](webapp/README.md) for Streamlit Community Cloud.
+[![CI](https://github.com/mmartinsie/webscraping-fotocasa/actions/workflows/ci.yml/badge.svg)](https://github.com/mmartinsie/webscraping-fotocasa/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)](pyproject.toml)
+[![Lint: ruff](https://img.shields.io/badge/lint-ruff-orange)](pyproject.toml)
 
-## Pipeline
+## Live demos
 
+| | What it shows |
+| --- | --- |
+| **[🌐 Static estimator](https://mmartinsie.github.io/webscraping-fotocasa/)** | A single HTML page (EN/ES) that runs the trained network in the browser — no backend, no build. Estimates from the district's €/m² and shows the neural network as a reference. |
+| **[🤖 LLM agent](webapp/README.md)** *(deploy from `webapp/`)* | Gemini + function calling. The model asks for the missing inputs, calls one tool, and every call/result is shown inline. A "Form" tab hits the same tool directly when the free quota runs out. |
+
+## What this project demonstrates
+
+- **Web scraping** — Selenium + BeautifulSoup, explicit waits, retry/backoff,
+  streaming writes with `--resume`, selectors isolated as constants.
+- **Data engineering** — a documented `raw → cleaned` pipeline
+  ([`prepare_dataset.py`](prepare_dataset.py) + [data dictionary](keras_neural_network/DATA.md)).
+- **ML with honest evaluation** — k-fold CV, non-neural baselines, target-leakage
+  handling, a saved model bundle, and a [model card](keras_neural_network/MODEL_CARD.md).
+  The write-up says plainly that a random forest beats the network here.
+- **Two deployments from one core** — the same NumPy forward pass powers the
+  static page, the CLI, and the agent tool.
+- **LLM agent** — tool-use / function-calling loop, made visible in the UI.
+- **Engineering hygiene** — 50+ tests, `ruff`, CI on Python 3.9/3.11/3.12,
+  type hints, `make check`.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  A["fotocasa.es"] -->|"webscraping/ (Selenium + BeautifulSoup)"| B[("buildings_information.csv")]
+  B -->|"prepare_dataset.py"| C[("dataset.csv")]
+  C -->|"recommend_price.py (k-fold CV)"| D["model bundle: .keras + scaler + metadata"]
+  R["data/: EUR-per-m2 and schools by district"] --> E
+  D -->|"export_web.py"| E[("docs/model.json + districts.json")]
+  E --> F["Static estimator (docs/, GitHub Pages)"]
+  E --> G["LLM agent (webapp/, Gemini + Streamlit)"]
 ```
-fotocasa.es ──webscraping/main.py──▶ buildings_information.csv
-                                            │
-                                   prepare_dataset.py
-                                            ▼
-                                       dataset.csv ──▶ keras_neural_network/*.py
-```
-
-`prepare_dataset.py` (repo root) cleans the raw scraper CSV into the columns the
-model scripts consume — see [`keras_neural_network/DATA.md`](keras_neural_network/DATA.md).
-
-Linting (`ruff`), compilation and tests run in CI (`.github/workflows/ci.yml`);
-locally, `make check` (or `ruff check . && ruff format --check . && pytest`).
 
 ## Results
 
-On `finalDataset3.csv` (~8.3k flats, 30% test split), predicting `Precio` from
-the 5 honest features (no `Precio_m2`):
+`finalDataset3.csv` (~8.3k flats, 30% test split), predicting `Precio` from the
+5 honest features (`Precio_m2` excluded — it leaks the target):
 
 | model | MAE | R² |
 | --- | ---: | ---: |
@@ -42,63 +59,67 @@ the 5 honest features (no `Precio_m2`):
 | random forest + one-hot `Distrito` | ~170k € | **0.70** |
 | best neural config (3×24, adam, MAE loss), 3-fold CV | ~193k € | 0.64 |
 
-A plain random forest beats every neural configuration here, and location
-(`Distrito`) adds a couple of R² points. Numbers vary a little by seed.
+A plain random forest beats every neural configuration, and location adds a
+couple of R² points. The thesis data is ~2020, so the demos lead with a
+`district €/m² × m²` estimate (~2024-2025 figures) and keep the network's output
+as a secondary reference.
 
-The thesis dataset is ~2020, so the network's price *levels* are dated. The demos
-therefore lead with a `district €/m² × m²` estimate from
-[`data/precio_m2_distrito.csv`](data/README.md) (~2024-2025 figures) and keep the
-network's output as a secondary reference.
+## Repository layout
 
-## Web scraping Fotocasa
+| Path | Contents |
+| --- | --- |
+| [`webscraping/`](webscraping/README.md) | Fotocasa scraper: `main.py` (CLI), `listing.py` (parser), `home.py` (dataclass). |
+| [`prepare_dataset.py`](prepare_dataset.py) | Raw scraper CSV → model-ready dataset. |
+| [`keras_neural_network/`](keras_neural_network/README.md) | `recommend_price.py` (CV + save), `predict.py`, `baseline.py`, `chat.py` (Claude CLI agent), `export_web.py`, shared `dataset.py` / `metrics.py`, [`DATA.md`](keras_neural_network/DATA.md), [`MODEL_CARD.md`](keras_neural_network/MODEL_CARD.md). |
+| [`webapp/`](webapp/README.md) | Streamlit + Gemini LLM agent, `pricing.py` (NumPy forward pass of the model, no TensorFlow). |
+| [`docs/`](docs/README.md) | The static estimator (`index.html` + generated `model.json` / `districts.json`). |
+| [`data/`](data/README.md) | Per-district €/m² and school-count reference tables. |
+| [`neural_network/`](neural_network/README.md) | Obsolete from-scratch NumPy network, kept for reference. |
+| `tests/` | Unit tests — scraper parsers, district/label parsing, metrics, dataset loading, the €/m² + NumPy forward pass, and the JS-vs-Python parity guard. |
 
-Contained in the `/webscraping` directory, it is made up of three scripts:
+## Quickstart
 
-- `main.py`
-    - Command-line entry point. Drives Firefox through *Selenium* (accept
-      cookies, page through the search results, read each card's district),
-      calls `scrape_listing()` per listing and writes the CSV.
-- `listing.py`
-    - `scrape_listing()` downloads and parses a single listing page and returns
-      a populated `Home`.
-- `home.py`
-    - `Home` dataclass representing one property (`url`, `district`, `price`,
-      `property_type`, `rooms`, `baths`, `size`, `floor`, `parking`).
+```bash
+# scrape (needs Firefox + geckodriver)
+cd webscraping && pip install -r requirements.txt
+python main.py --pages 5 --output buildings_information.csv
 
-See [`webscraping/README.md`](webscraping/README.md) for details.
+# clean the raw CSV (join a schools-per-district table for the Colegios column)
+python prepare_dataset.py webscraping/buildings_information.csv -o dataset.csv
 
-## Neural network
+# train + save a model bundle (uses the committed dataset by default)
+cd keras_neural_network && pip install -r requirements.txt
+python recommend_price.py --save web_model
+python predict.py web_model --set Superficie=90 --set Habitaciones=3
 
-There are two neural-network implementations in this repository. The first one,
-in the `/neural_network` directory, is obsolete and unused — it was a first
-iteration written from scratch with NumPy. The second one, in the
-`/keras_neural_network` directory, is the final implementation using the Python
-library *Keras*. That directory also includes `recommend_price.py` (benchmarks
-several network configs, recommends one, and can save it), `predict.py` (price a
-flat from a saved model), `baseline.py` (non-neural reference numbers) and
-`chat.py` (a Claude-powered chat that asks for the inputs and returns the price).
+# checks
+make check        # ruff + pytest + compile
+```
 
-See [`neural_network/README.md`](neural_network/README.md) and
-[`keras_neural_network/README.md`](keras_neural_network/README.md) for details.
+The static page is served straight from `docs/` (GitHub Pages → "Deploy from a
+branch" → `master` `/docs`). The agent deploys from `webapp/` on Streamlit
+Community Cloud — see [`webapp/README.md`](webapp/README.md).
+
+## Screenshots
+
+<!-- Capture from the live demos and drop the PNGs in docs/assets/. -->
+| Static estimator | LLM agent |
+| --- | --- |
+| ![Static estimator](docs/assets/estimator.png) | ![LLM agent](docs/assets/agent.png) |
 
 ## Authors ✒️
 
-This repository was created by:
-
 - Esther Gabay Diaz
-- Adrián Camino Muñoz - [adrian98cm](https://github.com/adrian98cm)
+- Adrián Camino Muñoz — [adrian98cm](https://github.com/adrian98cm)
 - María González de la Llana Domarco
-- Manuel Martín Sierra - [mmartinsie](https://github.com/mmartinsie)
-- Miriam Ramón González - [MiriamRG13](https://github.com/MiriamRG13)
+- Manuel Martín Sierra — [mmartinsie](https://github.com/mmartinsie)
+- Miriam Ramón González — [MiriamRG13](https://github.com/MiriamRG13)
 
 ## References
 
-The websites used during the development of the project:
-
-- [Web scraping with Python example — Edureka](https://www.edureka.co/blog/web-scraping-with-python/)
-- [Ander Fernández — How to program a neural network from scratch in Python](https://anderfernandez.com/blog/como-programar-una-red-neuronal-desde-0-en-python/)
-- [W3Schools — Python classes](https://www.w3schools.com/python/python_classes.asp)
-- [Machine Learning Mastery — Your first neural network in Python with Keras](https://machinelearningmastery.com/tutorial-first-neural-network-python-keras/)
+- [Web scraping with Python — Edureka](https://www.edureka.co/blog/web-scraping-with-python/)
+- [Ander Fernández — Neural network from scratch in Python](https://anderfernandez.com/blog/como-programar-una-red-neuronal-desde-0-en-python/)
+- [Machine Learning Mastery — First neural network with Keras](https://machinelearningmastery.com/tutorial-first-neural-network-python-keras/)
 
 ## License
 

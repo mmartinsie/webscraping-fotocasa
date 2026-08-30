@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Madrid Flat Price Estimator (webscraping-fotocasa)"
+abstract: >-
+  Scrapes property listings from Fotocasa, builds a cleaned dataset, trains and
+  evaluates price-prediction models for flats in Madrid, and ships a static
+  browser estimator and an LLM agent. Master's thesis project.
+type: software
+repository-code: "https://github.com/mmartinsie/webscraping-fotocasa"
+license: MIT
+authors:
+  - family-names: "Gabay Diaz"
+    given-names: "Esther"
+  - family-names: "Camino Muñoz"
+    given-names: "Adrián"
+  - family-names: "González de la Llana Domarco"
+    given-names: "María"
+  - family-names: "Martín Sierra"
+    given-names: "Manuel"
+  - family-names: "Ramón González"
+    given-names: "Miriam"
+keywords:
+  - web-scraping
+  - real-estate
+  - machine-learning
+  - keras
+  - madrid
