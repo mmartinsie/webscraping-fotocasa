@@ -1,9 +1,8 @@
-"""Export a saved model bundle to `docs/model.json` for the GitHub Pages demo.
+"""Export the GitHub Pages demo data.
 
-The network is tiny (5 inputs, a few small dense layers), so instead of shipping
-the whole TensorFlow.js runtime the page reimplements the forward pass in a dozen
-lines of JavaScript. This script writes the weights, the StandardScaler stats,
-the price-clip band and a few metadata fields it needs.
+Writes ``docs/model.json`` (the thesis network's weights + scaler + band, so the
+page can run the forward pass in ~15 lines of JavaScript instead of shipping the
+TensorFlow.js runtime) and ``docs/districts.json`` (the €/m² reference table).
 
     python recommend_price.py --save web_model
     python export_web.py web_model -o ../docs/model.json
@@ -12,11 +11,23 @@ the price-clip band and a few metadata fields it needs.
 from __future__ import annotations
 
 import argparse
+import csv
 import datetime as dt
 import json
 import os
 
 from predict import load_bundle, predict_price
+
+DISTRICT_CSV = os.path.join(os.path.dirname(__file__), "..", "data", "precio_m2_distrito.csv")
+
+
+def write_districts(output_dir: str) -> None:
+    with open(DISTRICT_CSV, encoding="utf-8", newline="") as handle:
+        table = {row["Distrito"]: float(row["EurM2"]) for row in csv.DictReader(handle)}
+    path = os.path.join(output_dir, "districts.json")
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(table, handle, ensure_ascii=False, indent=2)
+    print(f"Wrote {path} ({len(table)} districts)")
 
 
 def export(model_dir: str, output: str) -> None:
@@ -58,10 +69,12 @@ def export(model_dir: str, output: str) -> None:
         "_golden_median_price": round(predict_price(model, scaler, metadata, {}), 2),
     }
 
-    os.makedirs(os.path.dirname(os.path.abspath(output)), exist_ok=True)
+    out_dir = os.path.dirname(os.path.abspath(output))
+    os.makedirs(out_dir, exist_ok=True)
     with open(output, "w", encoding="utf-8") as handle:
         json.dump(bundle, handle, indent=2)
     print(f"Wrote {output} ({len(layers)} dense layers, {len(bundle['features'])} features)")
+    write_districts(out_dir)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

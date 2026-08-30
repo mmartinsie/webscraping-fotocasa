@@ -18,7 +18,7 @@ import time
 import google.generativeai as genai
 import streamlit as st
 
-from pricing import load_model, predict_price
+from pricing import estimate_by_district, load_districts, load_model, predict_price
 
 # gemini-*-lite models get the most generous free-tier request quota, which
 # matters here: automatic function calling makes 2-3 API calls per user turn.
@@ -28,29 +28,36 @@ MAX_RETRIES = 2
 
 st.set_page_config(page_title="Tasador conversacional", page_icon="🏠")
 MODEL = load_model()
+DISTRICTS = load_districts()
 
 SYSTEM = (
     "Ayudas a estimar el precio de venta de un piso en Madrid. Habla en español, "
-    "respuestas breves. Necesitas: número de habitaciones, número de aseos, "
-    "superficie en m², si tiene parking (sí/no) y cuántos colegios hay cerca "
-    "(si el usuario no lo sabe, usa 9 y díselo). Pregunta lo que falte, acepta "
-    "los datos en cualquier orden, y cuando los tengas todos llama a la función "
-    "estimar_precio y da el resultado en euros, aclarando que es una estimación "
-    "aproximada del modelo, no una tasación."
+    "respuestas breves. Necesitas: distrito de Madrid, número de habitaciones, "
+    "número de aseos, superficie en m², si tiene parking (sí/no) y cuántos "
+    "colegios hay cerca (si el usuario no lo sabe, usa 9 y díselo). Distritos "
+    f"válidos: {', '.join(DISTRICTS)}. Pregunta lo que falte, acepta los datos en "
+    "cualquier orden, y cuando los tengas todos llama a la función estimar_precio. "
+    "Da el resultado en euros: el principal (por €/m² del distrito, precios ~2024) "
+    "y menciona el de la red neuronal del TFM (datos ~2020) como referencia. "
+    "Aclara que son estimaciones aproximadas, no una tasación."
 )
 
 
-def estimar_precio(habitaciones: int, aseos: int, superficie: float, parking: int, colegios: int) -> dict:
+def estimar_precio(
+    distrito: str, habitaciones: int, aseos: int, superficie: float, parking: int, colegios: int
+) -> dict:
     """Estima el precio de venta de un piso en Madrid.
 
     Args:
+        distrito: distrito de Madrid (p. ej. Salamanca, Chamberí, Carabanchel).
         habitaciones: número de habitaciones.
         aseos: número de baños.
         superficie: superficie en metros cuadrados.
         parking: 1 si tiene plaza de garaje, 0 si no.
         colegios: número de colegios cercanos (usa 9 si se desconoce).
     """
-    price = predict_price(
+    by_district = estimate_by_district(DISTRICTS, distrito, superficie, parking)
+    nn_price = predict_price(
         MODEL,
         {
             "Habitaciones": habitaciones,
@@ -60,7 +67,11 @@ def estimar_precio(habitaciones: int, aseos: int, superficie: float, parking: in
             "Colegios": colegios,
         },
     )
-    return {"precio_estimado_eur": round(price)}
+    return {
+        "precio_estimado_eur": by_district["price_eur"],
+        "metodo": f"{by_district['distrito']} a {by_district['eur_m2']:,} €/m² (~2024)",
+        "referencia_red_neuronal_2020_eur": round(nn_price),
+    }
 
 
 def _from_secret_or_env(name: str) -> str | None:

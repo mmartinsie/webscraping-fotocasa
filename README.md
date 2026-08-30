@@ -7,7 +7,9 @@ and, on the other side, the neural network that predicts the price of a property
 based on its characteristics.
 
 **[Live demo](https://mmartinsie.github.io/webscraping-fotocasa/)** — a static
-page (in `docs/`) that runs the trained model entirely in the browser.
+page (in `docs/`) that estimates a price from the district's €/m²
+([`data/precio_m2_distrito.csv`](data/README.md), ~2024) and shows the thesis
+neural network's number (~2020 data) as a reference, all in the browser.
 A conversational version (Gemini + Streamlit) lives in
 [`webapp/`](webapp/README.md) for deploy on Streamlit Community Cloud.
 
@@ -42,6 +44,11 @@ the 5 honest features (no `Precio_m2`):
 
 A plain random forest beats every neural configuration here, and location
 (`Distrito`) adds a couple of R² points. Numbers vary a little by seed.
+
+The thesis dataset is ~2020, so the network's price *levels* are dated. The demos
+therefore lead with a `district €/m² × m²` estimate from
+[`data/precio_m2_distrito.csv`](data/README.md) (~2024-2025 figures) and keep the
+network's output as a secondary reference.
 
 ## Web scraping Fotocasa
 

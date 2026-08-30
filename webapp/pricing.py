@@ -1,20 +1,72 @@
-"""Load ``docs/model.json`` and run its forward pass in NumPy (no TensorFlow).
+"""Price estimation for the demos.
 
-Same maths as ``keras_neural_network/predict.py`` and the JavaScript in
-``docs/index.html`` - kept dependency-free so the Streamlit app has a fast cold
-start.
+Two estimates:
+
+- ``estimate_by_district`` - ``€/m² of the district × m²`` using the ~2024-2025
+  reference table in ``data/precio_m2_distrito.csv``. This carries the location
+  and current-price-level signal.
+- ``predict_price`` - the thesis neural network from ``docs/model.json``, run in
+  NumPy (no TensorFlow, fast cold start). Trained on ~2020 data with the district
+  dropped; kept as a secondary reference number.
+
+The NumPy forward pass matches ``keras_neural_network/predict.py`` and the
+JavaScript in ``docs/index.html``.
 """
 
 from __future__ import annotations
 
+import csv
 import json
+import unicodedata
 from pathlib import Path
 
 import numpy as np
 
-DEFAULT_MODEL_JSON = Path(__file__).resolve().parents[1] / "docs" / "model.json"
+_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_MODEL_JSON = _ROOT / "docs" / "model.json"
+DEFAULT_DISTRICT_CSV = _ROOT / "data" / "precio_m2_distrito.csv"
+
+PARKING_PREMIUM = 1.06  # a parking space adds roughly 6% to the price
 
 
+# --------------------------------------------------------------------------- #
+# District €/m² estimate
+# --------------------------------------------------------------------------- #
+def _norm(text: str) -> str:
+    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+    return text.strip().lower()
+
+
+def load_districts(path: str | Path = DEFAULT_DISTRICT_CSV) -> dict[str, float]:
+    """Return ``{district name: €/m²}`` from the reference CSV."""
+    with open(path, encoding="utf-8", newline="") as handle:
+        return {row["Distrito"]: float(row["EurM2"]) for row in csv.DictReader(handle)}
+
+
+def district_eur_m2(districts: dict[str, float], distrito: str | None) -> tuple[float, str]:
+    """Look up €/m² for ``distrito`` (accent/case-insensitive). Falls back to the
+    table average. Returns ``(€/m², matched name)``."""
+    average = sum(districts.values()) / len(districts)
+    if not distrito:
+        return average, "media de Madrid"
+    target = _norm(distrito)
+    for name, value in districts.items():
+        if _norm(name) == target or target in _norm(name) or _norm(name) in target:
+            return value, name
+    return average, "media de Madrid"
+
+
+def estimate_by_district(
+    districts: dict[str, float], distrito: str | None, superficie: float, parking: int = 0
+) -> dict:
+    eur_m2, matched = district_eur_m2(districts, distrito)
+    price = eur_m2 * float(superficie) * (PARKING_PREMIUM if parking else 1.0)
+    return {"price_eur": round(price), "eur_m2": round(eur_m2), "distrito": matched}
+
+
+# --------------------------------------------------------------------------- #
+# Thesis neural network (docs/model.json)
+# --------------------------------------------------------------------------- #
 def load_model(path: str | Path = DEFAULT_MODEL_JSON) -> dict:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 

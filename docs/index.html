@@ -48,7 +48,7 @@
   label { display: block; margin: .9rem 0 .3rem; font-weight: 600; font-size: .9rem; }
   label:first-of-type { margin-top: 0; }
   .hint { font-weight: 400; color: var(--muted); }
-  input[type="number"] {
+  input[type="number"], select {
     width: 100%;
     padding: .55rem .65rem;
     border: 1px solid var(--border);
@@ -93,11 +93,15 @@
 <body>
 <div class="wrap">
   <h1>Tasador de pisos de Madrid</h1>
-  <p class="lede">Estima el precio de venta con la red neuronal del TFM. El modelo
-    corre entero en tu navegador.</p>
+  <p class="lede">Estimación por <strong>€/m² del distrito</strong> (precios
+    ~2024) más la <strong>red neuronal del TFM</strong> (datos ~2020) como
+    referencia. Todo corre en tu navegador.</p>
 
   <div class="card">
     <form id="form">
+      <label for="Distrito">Distrito</label>
+      <select id="Distrito"></select>
+
       <label for="Habitaciones">Habitaciones</label>
       <input type="number" id="Habitaciones" min="1" step="1" value="3" required>
 
@@ -116,27 +120,41 @@
         <label for="Parking">Tiene plaza de parking</label>
       </div>
 
-      <button type="submit" id="submit" disabled>Cargando modelo…</button>
+      <button type="submit" id="submit" disabled>Cargando…</button>
     </form>
 
     <div class="result" id="result" hidden>
       <div class="price" id="price">—</div>
       <small id="note"></small>
+      <small id="nn"></small>
     </div>
 
     <p class="about" id="about"></p>
   </div>
 
   <footer>
-    Estimación aproximada de un modelo entrenado con datos de Fotocasa (~2020);
-    no es una tasación profesional.
+    Estimaciones aproximadas: los €/m² por distrito son cifras ~2024-2025 de
+    índices públicos y la red se entrenó con datos de Fotocasa (~2020). No es una
+    tasación profesional.
     <a href="https://github.com/mmartinsie/webscraping-fotocasa">Código en GitHub</a>.
   </footer>
 </div>
 
 <script>
 const relu = (x) => (x > 0 ? x : 0);
-let M = null;
+const PARKING_PREMIUM = 1.06;
+let M = null;   // neural model
+let D = null;   // {distrito: eur/m2}
+
+function districtAvg() {
+  const v = Object.values(D);
+  return v.reduce((a, b) => a + b, 0) / v.length;
+}
+
+function districtEstimate(distrito, superficie, parking) {
+  const eurM2 = (D && D[distrito]) || districtAvg();
+  return { price: eurM2 * superficie * (parking ? PARKING_PREMIUM : 1), eurM2 };
+}
 
 function predict(values) {
   // values: numbers in M.features order
@@ -165,18 +183,30 @@ async function init() {
   const submit = document.getElementById("submit");
   const about = document.getElementById("about");
   try {
-    M = await (await fetch("model.json", { cache: "no-cache" })).json();
+    [M, D] = await Promise.all([
+      fetch("model.json", { cache: "no-cache" }).then((r) => r.json()),
+      fetch("districts.json", { cache: "no-cache" }).then((r) => r.json()),
+    ]);
   } catch (e) {
-    submit.textContent = "No se pudo cargar el modelo";
+    submit.textContent = "No se pudieron cargar los datos";
     about.innerHTML = '<span class="err">Abre esta página desde el sitio publicado '
-      + '(o sirviéndola con <code>python -m http.server</code>): '
-      + '<code>file://</code> no permite cargar model.json.</span>';
+      + '(o sírvela con <code>python -m http.server</code>): '
+      + '<code>file://</code> no permite cargar los JSON.</span>';
     return;
   }
   submit.disabled = false;
   submit.textContent = "Calcular precio";
 
-  // Prefill each field with the model's stored training median.
+  // District dropdown, sorted by €/m² (most expensive first).
+  const select = document.getElementById("Distrito");
+  Object.entries(D).sort((a, b) => b[1] - a[1]).forEach(([name, v]) => {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = `${name} — ${Math.round(v).toLocaleString("es-ES")} €/m²`;
+    select.appendChild(opt);
+  });
+
+  // Prefill numeric fields with the model's stored training median.
   const medians = M.feature_medians || {};
   for (const name of M.features) {
     const el = document.getElementById(name);
@@ -187,25 +217,34 @@ async function init() {
   }
 
   const mae = M.meta.mae != null ? eur(M.meta.mae) : "n/d";
-  const r2 = M.meta.r2 != null ? M.meta.r2.toFixed(2) : "n/d";
-  about.textContent = `Modelo: ${M.meta.config || "red neuronal"} · error medio ≈ `
-    + `${mae} · R² ${r2} · generado ${M.meta.generated || ""}`;
+  about.textContent = `Referencia TFM: ${M.meta.config || "red neuronal"} · `
+    + `error medio ≈ ${mae} · datos ~2020`;
 }
 
 document.getElementById("form").addEventListener("submit", (ev) => {
   ev.preventDefault();
-  if (!M) return;
-  const values = M.features.map((name) => {
+  if (!M || !D) return;
+  const num = (id) => parseFloat(document.getElementById(id).value || "0");
+  const distrito = document.getElementById("Distrito").value;
+  const superficie = num("Superficie");
+  const parking = document.getElementById("Parking").checked ? 1 : 0;
+
+  const { price: distPrice, eurM2 } = districtEstimate(distrito, superficie, parking);
+
+  const nnValues = M.features.map((name) => {
     const el = document.getElementById(name);
     if (!el) return 0;
     return el.type === "checkbox" ? (el.checked ? 1 : 0) : parseFloat(el.value || "0");
   });
-  const { price, clamped } = predict(values);
+  const { price: nnPrice } = predict(nnValues);
+
   document.getElementById("result").hidden = false;
-  document.getElementById("price").textContent = eur(price);
-  document.getElementById("note").textContent = clamped
-    ? "valor recortado al rango de precios del dataset"
-    : "estimación del modelo";
+  document.getElementById("price").textContent = eur(distPrice);
+  document.getElementById("note").textContent =
+    `${distrito} · ${Math.round(eurM2).toLocaleString("es-ES")} €/m²`
+    + (parking ? " · +6% parking" : "");
+  document.getElementById("nn").textContent =
+    `Red neuronal TFM (datos ~2020): ${eur(nnPrice)}`;
 });
 
 init();

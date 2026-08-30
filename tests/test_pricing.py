@@ -3,7 +3,13 @@ from pathlib import Path
 
 import pytest
 
-from pricing import load_model, predict_price
+from pricing import (
+    district_eur_m2,
+    estimate_by_district,
+    load_districts,
+    load_model,
+    predict_price,
+)
 
 MODEL_JSON = Path(__file__).resolve().parents[1] / "docs" / "model.json"
 
@@ -46,3 +52,41 @@ def test_matches_committed_golden(model):
     if golden is None:
         pytest.skip("no golden stored in model.json")
     assert predict_price(model, {}) == pytest.approx(golden, abs=1.0)
+
+
+# --- district €/m² estimate ------------------------------------------------- #
+
+
+@pytest.fixture
+def districts():
+    return load_districts()
+
+
+def test_districts_table_has_all_madrid_districts(districts):
+    assert len(districts) == 21
+    assert "Salamanca" in districts and "Villaverde" in districts
+
+
+def test_district_lookup_is_accent_and_case_insensitive(districts):
+    assert district_eur_m2(districts, "chamberi")[1] == "Chamberí"
+    assert district_eur_m2(districts, "SALAMANCA")[1] == "Salamanca"
+
+
+def test_unknown_district_falls_back_to_average(districts):
+    value, name = district_eur_m2(districts, "Narnia")
+    assert name == "media de Madrid"
+    assert value == pytest.approx(sum(districts.values()) / len(districts))
+
+
+def test_estimate_scales_with_size_and_parking(districts):
+    base = estimate_by_district(districts, "Salamanca", 90, parking=0)["price_eur"]
+    assert estimate_by_district(districts, "Salamanca", 180, parking=0)["price_eur"] == pytest.approx(
+        2 * base, rel=1e-6
+    )
+    assert estimate_by_district(districts, "Salamanca", 90, parking=1)["price_eur"] > base
+
+
+def test_expensive_district_costs_more(districts):
+    salamanca = estimate_by_district(districts, "Salamanca", 90)["price_eur"]
+    villaverde = estimate_by_district(districts, "Villaverde", 90)["price_eur"]
+    assert salamanca > 2 * villaverde
