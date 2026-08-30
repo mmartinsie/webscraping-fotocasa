@@ -10,8 +10,8 @@ based on its characteristics.
 page (in `docs/`, EN/ES) that estimates a price from the district's €/m²
 ([`data/precio_m2_distrito.csv`](data/README.md), ~2024) and shows the thesis
 neural network's number (~2020 data) as a reference, all in the browser.
-A conversational version (Gemini + Streamlit, EN/ES) lives in
-[`webapp/`](webapp/README.md) for deploy on Streamlit Community Cloud.
+An LLM-agent version (Gemini function calling + Streamlit, EN/ES, with a form
+fallback) lives in [`webapp/`](webapp/README.md) for Streamlit Community Cloud.
 
 ## Pipeline
 

@@ -1,10 +1,15 @@
-"""Conversational price estimator - Streamlit + Google Gemini (free tier).
+"""LLM-agent demo: a Madrid flat price estimator.
 
-Gemini chats with the user (in English or Spanish, matching how they write),
-collects the flat's features including the Madrid district, and calls the
-``estimate_price`` tool. That tool returns a "district €/m² x m2" estimate
-(~2024 figures from ``data/precio_m2_distrito.csv``) plus the thesis network's
-number from ``docs/model.json`` (NumPy, no TensorFlow) as a reference.
+Shows a tool-use / function-calling loop end to end:
+
+    system prompt + tool schema  ->  Gemini asks for the missing inputs
+    ->  Gemini calls estimate_price(district, rooms, ...)  (SDK auto-runs it)
+    ->  the tool computes the price locally (webapp/pricing.py, NumPy, no TF)
+    ->  Gemini turns the result into a sentence
+
+The "Chat" tab drives it with Gemini and shows every tool call/result; the
+"Form" tab calls the same tool directly, so the app still works when Gemini's
+free-tier quota is exhausted.
 
 Deploy on Streamlit Community Cloud with the main file set to
 ``webapp/streamlit_app.py`` and a ``GEMINI_API_KEY`` secret (free key at
@@ -15,6 +20,7 @@ Run locally:  GEMINI_API_KEY=...  streamlit run webapp/streamlit_app.py
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import time
@@ -36,6 +42,7 @@ from pricing import (
 # Pin another with a GEMINI_MODEL secret / env var or the sidebar picker.
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
 MAX_RETRIES = 2
+RANGE_PCT = 0.15  # +/- band shown around the point estimate
 
 st.set_page_config(page_title="Madrid flat price chat", page_icon="🏠")
 MODEL = load_model()
@@ -72,6 +79,28 @@ STR = {
         "models_available": "\n\nAvailable models: ",
         "gemini_error": "Error talking to Gemini: {exc}",
         "failed": "Could not complete the request.",
+        "tab_chat": "Chat",
+        "tab_form": "Form",
+        "how": "How this agent works",
+        "how_body": "A system prompt + the `estimate_price` tool schema are sent to "
+        "Gemini. It asks for whatever is missing, then emits a function call; the "
+        "SDK runs `estimate_price` locally and feeds the result back, and Gemini "
+        "phrases the answer. Every call/result is shown below.",
+        "examples": [
+            "3 rooms, 2 baths, 90 m², Salamanca, no parking",
+            "2-bed 70 m² flat in Carabanchel with parking",
+        ],
+        "f_district": "District",
+        "f_rooms": "Rooms",
+        "f_baths": "Bathrooms",
+        "f_area": "Floor area (m²)",
+        "f_parking": "Has parking",
+        "f_go": "Estimate",
+        "f_result": "Estimated price",
+        "f_nn": "Neural-network reference (~2020)",
+        "f_schools": "{n} schools (from the district)",
+        "tool_call": "🔧 tool call",
+        "tool_result": "↩ tool result",
     },
     "Español": {
         "title": "🏠 Tasador conversacional de pisos",
@@ -90,6 +119,29 @@ STR = {
         "models_available": "\n\nModelos disponibles: ",
         "gemini_error": "Error al hablar con Gemini: {exc}",
         "failed": "No se pudo completar la petición.",
+        "tab_chat": "Chat",
+        "tab_form": "Formulario",
+        "how": "Cómo funciona este agente",
+        "how_body": "Se envía a Gemini un system prompt + el esquema de la "
+        "herramienta `estimate_price`. Pregunta lo que falte, luego emite una "
+        "llamada a función; el SDK ejecuta `estimate_price` en local y le devuelve "
+        "el resultado, y Gemini redacta la respuesta. Cada llamada/resultado se "
+        "muestra abajo.",
+        "examples": [
+            "3 habitaciones, 2 baños, 90 m², Salamanca, sin parking",
+            "piso de 2 hab, 70 m², en Carabanchel con garaje",
+        ],
+        "f_district": "Distrito",
+        "f_rooms": "Habitaciones",
+        "f_baths": "Aseos",
+        "f_area": "Superficie (m²)",
+        "f_parking": "Tiene parking",
+        "f_go": "Estimar",
+        "f_result": "Precio estimado",
+        "f_nn": "Referencia red neuronal (~2020)",
+        "f_schools": "{n} colegios (según el distrito)",
+        "tool_call": "🔧 llamada a herramienta",
+        "tool_result": "↩ resultado",
     },
 }
 
@@ -157,6 +209,38 @@ def _retry_after(exc: Exception) -> float:
     return min(float(match.group(1)) + 1, 30) if match else 10.0
 
 
+def price_range(value: float) -> str:
+    return f"± {value * RANGE_PCT:,.0f} €"
+
+
+def _to_dict(mapping) -> dict:
+    try:
+        return {k: v for k, v in dict(mapping).items()}
+    except Exception:
+        return {}
+
+
+def render_history(chat, t: dict) -> None:
+    """Replay the conversation, surfacing every function call and its result."""
+    for message in chat.history:
+        role = "assistant" if message.role == "model" else "user"
+        for part in message.parts:
+            text = getattr(part, "text", "") or ""
+            if text.strip():
+                with st.chat_message(role):
+                    st.write(text)
+            call = getattr(part, "function_call", None)
+            if call and getattr(call, "name", ""):
+                args = ", ".join(f"{k}={v}" for k, v in _to_dict(call.args).items())
+                with st.chat_message("assistant"):
+                    st.caption(f"{t['tool_call']}: `{call.name}({args})`")
+            resp = getattr(part, "function_response", None)
+            if resp and getattr(resp, "name", ""):
+                with st.chat_message("assistant"):
+                    st.caption(t["tool_result"])
+                    st.code(json.dumps(_to_dict(resp.response), ensure_ascii=False, indent=2), "json")
+
+
 def send_message(chat, prompt: str, t: dict) -> str:
     """Send a turn, backing off once or twice on a 429 (free-tier rate limit)."""
     for attempt in range(MAX_RETRIES + 1):
@@ -210,17 +294,41 @@ if st.session_state.get("model_name") != model_name:
         st.stop()
 chat = st.session_state.chat
 
-for message in chat.history:
-    role = "assistant" if message.role == "model" else "user"
-    text = "".join(getattr(part, "text", "") for part in message.parts)
-    if text.strip():
-        with st.chat_message(role):
-            st.write(text)
+with st.sidebar, st.expander(t["how"]):
+    st.markdown(t["how_body"])
 
-if prompt := st.chat_input(t["input"]):
-    with st.chat_message("user"):
-        st.write(prompt)
-    with st.chat_message("assistant"):
-        with st.spinner(t["thinking"]):
-            answer = send_message(chat, prompt, t)
-        st.write(answer)
+tab_chat, tab_form = st.tabs([t["tab_chat"], t["tab_form"]])
+
+# --- Form tab: calls the tool directly, always works ---------------------- #
+with tab_form:
+    with st.form("estimate"):
+        district = st.selectbox(t["f_district"], sorted(DISTRICTS))
+        c1, c2, c3 = st.columns(3)
+        rooms = c1.number_input(t["f_rooms"], 1, 20, 3)
+        baths = c2.number_input(t["f_baths"], 1, 10, 2)
+        area = c3.number_input(t["f_area"], 15, 1000, 90)
+        parking = st.checkbox(t["f_parking"])
+        go = st.form_submit_button(t["f_go"])
+    if go:
+        r = estimate_price(district, int(rooms), int(baths), float(area), int(parking))
+        st.metric(t["f_result"], f"{r['price_eur']:,.0f} €", price_range(r["price_eur"]), delta_color="off")
+        st.caption(f"{r['method']} · " + t["f_schools"].format(n=r["schools_by_district"]))
+        st.caption(f"{t['f_nn']}: {r['reference_neural_network_2020_eur']:,.0f} €")
+
+# --- Chat tab: the Gemini agent ----------------------------------------- #
+prompt = st.chat_input(t["input"])
+with tab_chat:
+    cols = st.columns(len(t["examples"]))
+    for col, example in zip(cols, t["examples"]):
+        if col.button(example, use_container_width=True):
+            prompt = example
+
+    render_history(chat, t)
+
+    if prompt:
+        with st.chat_message("user"):
+            st.write(prompt)
+        with st.chat_message("assistant"):
+            with st.spinner(t["thinking"]):
+                answer = send_message(chat, prompt, t)
+            st.write(answer)

@@ -1,12 +1,32 @@
-# Conversational web app
+# LLM-agent demo (tool use / function calling)
 
-`streamlit_app.py` is a chat where **Google Gemini** collects the flat's features
-(including the Madrid district) and calls a tool that returns two numbers:
+`streamlit_app.py` is a small **agent**: it gives Gemini a system prompt and one
+tool, and lets the model drive the loop.
+
+```
+system prompt + estimate_price(district, rooms, bathrooms, area_m2, parking) schema
+        │
+        ▼
+Gemini asks the user for whatever is missing
+        │
+        ▼
+Gemini emits a function call  ──►  the SDK runs estimate_price locally
+        │                                    │
+        │  ◄─────────────  tool result  ◄────┘
+        ▼
+Gemini writes the answer
+```
+
+`estimate_price` (in `streamlit_app.py`) returns:
 
 - the main estimate = `district €/m² × m²` from
   [`../data/precio_m2_distrito.csv`](../data/README.md) (~2024-2025), +6% for parking;
 - the thesis network's price from [`../docs/model.json`](../docs/model.json) as a
   reference (NumPy forward pass in `pricing.py` - no TensorFlow, fast cold start).
+
+The **Chat** tab shows every tool call and result inline. The **Form** tab calls
+the same `estimate_price` directly, so the app still works when Gemini's
+free-tier quota is used up.
 
 Free to run: Gemini's free tier covers a demo's traffic, and visitors don't need
 a key of their own.
