@@ -18,9 +18,10 @@ import streamlit as st
 
 from pricing import load_model, predict_price
 
-# Free-tier chat model. Override with a GEMINI_MODEL secret / env var if this one
-# is retired (older names like gemini-1.5-flash now 404 on the public API).
-DEFAULT_GEMINI_MODEL = "gemini-2.0-flash"
+# "…-latest" is an alias Google keeps pointing at the current model, so it does
+# not rot when specific versions (gemini-1.5-flash, gemini-2.0-flash, …) retire.
+# Override with a GEMINI_MODEL secret / env var or the sidebar picker.
+DEFAULT_GEMINI_MODEL = "gemini-flash-latest"
 
 st.set_page_config(page_title="Tasador conversacional", page_icon="🏠")
 MODEL = load_model()
@@ -68,16 +69,23 @@ def _from_secret_or_env(name: str) -> str | None:
     return os.environ.get(name)
 
 
+@st.cache_data(show_spinner=False)
 def available_models() -> list[str]:
-    """Model names that support generateContent, for a helpful error message."""
+    """Model names that support generateContent (for the picker / error hints)."""
     try:
-        return [
+        names = [
             m.name.removeprefix("models/")
             for m in genai.list_models()
             if "generateContent" in getattr(m, "supported_generation_methods", [])
         ]
+        return [n for n in names if "flash" in n or "pro" in n] or names
     except Exception:
         return []
+
+
+def build_chat(model_name: str):
+    model = genai.GenerativeModel(model_name, system_instruction=SYSTEM, tools=[estimar_precio])
+    return model.start_chat(enable_automatic_function_calling=True)
 
 
 st.title("🏠 Tasador conversacional de pisos")
@@ -92,17 +100,20 @@ if not api_key:
     st.stop()
 genai.configure(api_key=api_key)
 
-model_name = _from_secret_or_env("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL
+preferred = _from_secret_or_env("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL
+options = available_models() or [preferred]
+if preferred not in options:
+    options = [preferred, *options]
+with st.sidebar:
+    model_name = st.selectbox("Modelo Gemini", options, index=options.index(preferred))
 
-if "chat" not in st.session_state:
+# (Re)build the chat when the app starts or the model changes.
+if st.session_state.get("model_name") != model_name:
     try:
-        model = genai.GenerativeModel(model_name, system_instruction=SYSTEM, tools=[estimar_precio])
-        st.session_state.chat = model.start_chat(enable_automatic_function_calling=True)
+        st.session_state.chat = build_chat(model_name)
+        st.session_state.model_name = model_name
     except Exception as exc:
-        st.error(f"No se pudo cargar el modelo `{model_name}`: {exc}")
-        models = available_models()
-        if models:
-            st.info("Modelos disponibles con tu clave:\n\n- " + "\n- ".join(models))
+        st.error(f"No se pudo cargar `{model_name}`: {exc}")
         st.stop()
 chat = st.session_state.chat
 
