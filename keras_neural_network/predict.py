@@ -23,12 +23,13 @@ class BundleError(Exception):
 
 
 def load_bundle(directory: str):
-    import joblib  # heavy imports kept out of the module import path
-    import keras
-
     for name in ("model.keras", "scaler.joblib", "metadata.json"):
         if not os.path.exists(os.path.join(directory, name)):
             raise BundleError(f"{directory!r} is not a model bundle (missing {name})")
+
+    import joblib  # heavy imports kept out of the module import path
+    import keras
+
     with open(os.path.join(directory, "metadata.json"), encoding="utf-8") as handle:
         metadata = json.load(handle)
     model = keras.models.load_model(os.path.join(directory, "model.keras"))
