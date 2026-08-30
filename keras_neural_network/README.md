@@ -13,12 +13,12 @@ and limitations.
 | --- | --- |
 | `model.py` | Trains the thesis model (CLI): a `Sequential` network with four hidden `Dense(6, relu)` layers and a `Dense(1, relu)` output, SGD + `mean_squared_logarithmic_error`, 150 epochs, 30% validation split. Prints the minimum MSLE; `--plot` charts the history. |
 | `select_model.py` | Compares optimizers (`SGD`, `RMSprop`, `Adam` by default) with k-fold cross-validation, scoring by mean squared error, and reports the best. |
-| `recommend_price.py` | Cross-validates several network configurations, reports the best and (with `--save DIR`) persists it. See [Model recommender](#model-recommender-recommend_pricepy). |
-| `baseline.py` | Non-neural references (mean predictor, linear regression, random forest) on the same features/split. `--with-district` adds one-hot `Distrito` to show what location alone is worth. |
-| `predict.py` | Loads a saved bundle and prices a single flat (`--set NAME=VALUE` / `--json`); missing features default to the stored training median. |
-| `chat.py` | Conversational front-end: Claude asks you for the five features, then calls the saved model and tells you the price. See [Chat estimator](#chat-estimator-chatpy). |
-| `export_web.py` | Exports a saved bundle to `../docs/model.json` for the browser demo (weights + scaler + price band, no TensorFlow.js runtime). |
-| `dataset.py` / `metrics.py` | Shared dataset loading and regression scoring. |
+| `recommend_price.py` | Cross-validates several network configurations, reports the best and (with `--save DIR`) persists it; `--with-district` adds the one-hot `Distrito`. See [Model recommender](#model-recommender-recommend_pricepy). |
+| `baseline.py` | Non-neural references (mean predictor, linear regression, random forest) on the same features/split. `--with-district` adds one-hot `Distrito`. |
+| `predict.py` | Loads a saved bundle and prices a single flat (`--set NAME=VALUE` / `--json`, e.g. `--set Distrito=Retiro`); missing numeric features default to the stored median. |
+| `chat.py` | Conversational front-end: Claude asks you for the model's features (incl. district) and calls the saved model. See [Chat estimator](#chat-estimator-chatpy). |
+| `export_web.py` | Exports a saved bundle to `../docs/model.json` / `districts.json` for the browser demo (weights + scaler + district categories, no TensorFlow.js runtime). |
+| `dataset.py` / `metrics.py` | Shared dataset loading (`load_xy`, `one_hot_district`) and regression scoring. |
 | `notebook.ipynb` | Exploratory notebook mirroring `model.py`. |
 
 ## Features
@@ -40,13 +40,13 @@ this way.
 
 ## Model recommender (`recommend_price.py`)
 
-1. **Load** – `dataset.load_xy` selects the feature columns by name (so a CSV with
-   or without a leading index column both work) and median-fills gaps.
+1. **Load** – `dataset.load_xy` selects the numeric columns by name and
+   median-fills gaps; `--with-district` appends `one_hot_district` (21 columns).
 2. **Cross-validate** – each of the 6 configurations below is trained from scratch
-   on every fold of a `--folds`-way `KFold` (default 3), with a fresh
-   `StandardScaler` per fold and `EarlyStopping` (patience 15) on an inner
-   validation split. Configs are ranked by **mean CV MAE** (RMSE / MAPE / R² are
-   reported too).
+   on every fold of a `--folds`-way `KFold` (default 3). A fresh scaler per fold
+   standardizes the **numeric** columns only (the one-hot is passed through);
+   `EarlyStopping` (patience 15) runs on an inner validation split. Configs are
+   ranked by **mean CV MAE** (RMSE / MAPE / R² reported too).
 
    | config | hidden layers | optimizer | loss |
    | --- | --- | --- | --- |
@@ -84,8 +84,8 @@ cd keras_neural_network
 python baseline.py --with-district             # non-neural reference numbers
 python model.py --epochs 150                   # train the thesis model
 python select_model.py --optimizers SGD Adam   # cross-validate optimizers
-python recommend_price.py --folds 3 --save model_dir   # CV, recommend, save
-python predict.py model_dir --set Habitaciones=3 --set Superficie=90
+python recommend_price.py --with-district --save model_dir   # CV, recommend, save
+python predict.py model_dir --set Superficie=90 --set Distrito=Retiro
 ```
 
 On Windows, if `python` opens the Microsoft Store, use the launcher: `py model.py`.
@@ -102,7 +102,7 @@ model via a tool and reports the price — you never touch the CLI flags, and a
 model retrained on different features just works.
 
 ```bash
-python recommend_price.py --save model_dir   # once: train and save the model
+python recommend_price.py --with-district --save model_dir   # once: train + save
 export ANTHROPIC_API_KEY=sk-ant-...          # or run `ant auth login`
 python chat.py model_dir                      # --model claude-haiku-4-5 for a cheaper run
 ```

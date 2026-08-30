@@ -16,7 +16,7 @@ network are both taken from the selected district. The network is tiny, so
 
 ```bash
 cd keras_neural_network
-python recommend_price.py --save web_model
+python recommend_price.py --with-district --save web_model   # --with-district: deployed model is location-aware
 python export_web.py web_model -o ../docs/model.json
 git add docs/model.json docs/districts.json && git commit -m "Refresh demo data"
 ```

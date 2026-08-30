@@ -18,8 +18,8 @@ SDK runs the tool locally → result goes back → Gemini writes the answer
 - `estimate_price` — one flat: `district €/m² × m²` from
   [`../data/precio_m2_distrito.csv`](../data/README.md) (~2024-2025, +6% for
   parking) plus the thesis network's price from
-  [`../docs/model.json`](../docs/model.json) as a reference (`Colegios` is looked
-  up from the district).
+  [`../docs/model.json`](../docs/model.json) as a reference. Both `Colegios` and
+  the network's one-hot district come from the chosen district.
 - `compare_districts` — the same flat priced across all 21 districts, cheapest first.
 
 The **Chat** tab shows every tool call/result inline and the sidebar tracks

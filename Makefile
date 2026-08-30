@@ -15,7 +15,7 @@ check: lint test
 
 # Rebuild the browser demo's model (docs/model.json) from the current code.
 demo-model:
-	cd keras_neural_network && $(PYTHON) recommend_price.py --save web_model
+	cd keras_neural_network && $(PYTHON) recommend_price.py --with-district --save web_model
 	cd keras_neural_network && $(PYTHON) export_web.py web_model -o ../docs/model.json
 
 # Clean the raw scraper CSV into a model-ready dataset.

@@ -11,9 +11,9 @@ These are estimates, not an official series - update them from
 Madrid capital, por distrito) or the Fotocasa Índice Inmobiliario.
 
 Used by `webapp/pricing.py` (`estimate_by_district`) and, as `docs/districts.json`,
-by the browser demo. It gives the location + "current price level" signal that
-the thesis neural network (trained on ~2020 data, district dropped) does not
-have.
+by the browser demo. It carries the **current** price level; the thesis network
+(trained on ~2020 data, one-hot district) captures relative location differences
+but from dated prices.
 
 ## `colegios_distrito.csv`
 
