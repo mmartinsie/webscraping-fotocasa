@@ -18,7 +18,7 @@ from keras.models import Sequential
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import KFold
 
-from dataset import FEATURES, LEAKY_FEATURE, load_xy
+from dataset import FEATURES, LEAKY_FEATURE, DatasetError, load_xy
 
 RANDOM_SEED = 42
 MODEL_FEATURES = [LEAKY_FEATURE, *FEATURES]
@@ -71,7 +71,10 @@ def main(argv: list[str] | None = None) -> int:
     np.random.seed(RANDOM_SEED)
     keras.utils.set_random_seed(RANDOM_SEED)
 
-    X, y = load_xy(args.dataset, MODEL_FEATURES)
+    try:
+        X, y = load_xy(args.dataset, MODEL_FEATURES)
+    except DatasetError as exc:
+        raise SystemExit(str(exc)) from exc
 
     results = {}
     for optimizer in args.optimizers:

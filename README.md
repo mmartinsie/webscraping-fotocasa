@@ -23,7 +23,23 @@ fotocasa.es ──webscraping/main.py──▶ buildings_information.csv
 model scripts consume — see [`keras_neural_network/DATA.md`](keras_neural_network/DATA.md).
 
 Linting (`ruff`), compilation and tests run in CI (`.github/workflows/ci.yml`);
-run them locally with `ruff check . && ruff format --check . && pytest`.
+locally, `make check` (or `ruff check . && ruff format --check . && pytest`).
+
+## Results
+
+On `finalDataset3.csv` (~8.3k flats, 30% test split), predicting `Precio` from
+the 5 honest features (no `Precio_m2`):
+
+| model | MAE | R² |
+| --- | ---: | ---: |
+| mean baseline | ~421k € | 0.00 |
+| linear regression | ~204k € | 0.63 |
+| **random forest** | **~170k €** | **0.68** |
+| random forest + one-hot `Distrito` | ~170k € | **0.70** |
+| best neural config (3×24, adam, MAE loss), 3-fold CV | ~193k € | 0.64 |
+
+A plain random forest beats every neural configuration here, and location
+(`Distrito`) adds a couple of R² points. Numbers vary a little by seed.
 
 ## Web scraping Fotocasa
 

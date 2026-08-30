@@ -19,7 +19,7 @@ import numpy as np
 from keras.layers import Dense, Input
 from keras.models import Sequential
 
-from dataset import FEATURES, LEAKY_FEATURE, load_xy
+from dataset import FEATURES, LEAKY_FEATURE, DatasetError, load_xy
 
 RANDOM_SEED = 42
 
@@ -71,7 +71,10 @@ def main(argv: list[str] | None = None) -> int:
     np.random.seed(RANDOM_SEED)
     keras.utils.set_random_seed(RANDOM_SEED)
 
-    X, y = load_xy(args.dataset, MODEL_FEATURES)
+    try:
+        X, y = load_xy(args.dataset, MODEL_FEATURES)
+    except DatasetError as exc:
+        raise SystemExit(str(exc)) from exc
     model = build_model(args.optimizer, args.loss, args.learning_rate)
     history = model.fit(
         X,

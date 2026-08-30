@@ -175,6 +175,17 @@ async function init() {
   }
   submit.disabled = false;
   submit.textContent = "Calcular precio";
+
+  // Prefill each field with the model's stored training median.
+  const medians = M.feature_medians || {};
+  for (const name of M.features) {
+    const el = document.getElementById(name);
+    if (el && medians[name] != null) {
+      if (el.type === "checkbox") el.checked = Math.round(medians[name]) === 1;
+      else el.value = Math.round(medians[name]);
+    }
+  }
+
   const mae = M.meta.mae != null ? eur(M.meta.mae) : "n/d";
   const r2 = M.meta.r2 != null ? M.meta.r2.toFixed(2) : "n/d";
   about.textContent = `Modelo: ${M.meta.config || "red neuronal"} · error medio ≈ `

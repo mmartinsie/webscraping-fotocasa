@@ -2,22 +2,24 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
-# CSV column order used by the scraper output. The names are Spanish on purpose:
-# they match the existing ``buildings_information.csv`` and what the model scripts
-# expect (they ``drop(["Tipo", "Distrito"])``).
-CSV_HEADERS = [
-    "Precio",
-    "Distrito",
-    "Tipo",
-    "Habitaciones",
-    "Aseos",
-    "Superficie",
-    "Planta",
-    "Parking",
-    "URL",
+# Single source of truth for the scraper's CSV: (column, how to read it from a Home).
+# The Spanish names match the existing ``buildings_information.csv`` and what the
+# model scripts expect (they ``drop(["Tipo", "Distrito"])``).
+_CSV_FIELDS: list[tuple[str, Callable[[Home], object]]] = [
+    ("Precio", lambda h: h.price),
+    ("Distrito", lambda h: h.district),
+    ("Tipo", lambda h: h.property_type),
+    ("Habitaciones", lambda h: h.rooms),
+    ("Aseos", lambda h: h.baths),
+    ("Superficie", lambda h: h.size),
+    ("Planta", lambda h: h.floor),
+    ("Parking", lambda h: 1 if h.parking else None),
+    ("URL", lambda h: h.url),
 ]
+CSV_HEADERS = [column for column, _ in _CSV_FIELDS]
 
 
 @dataclass
@@ -39,16 +41,18 @@ class Home:
     floor: int | None = None
     parking: bool = False
 
+    def is_empty(self) -> bool:
+        """True when the detail page yielded nothing (likely a stale selector)."""
+        return (
+            self.price is None
+            and self.property_type is None
+            and self.rooms is None
+            and self.baths is None
+            and self.size is None
+            and self.floor is None
+            and not self.parking
+        )
+
     def to_csv_row(self) -> dict[str, object]:
         """Return the listing as a dict keyed by :data:`CSV_HEADERS`."""
-        return {
-            "Precio": self.price,
-            "Distrito": self.district,
-            "Tipo": self.property_type,
-            "Habitaciones": self.rooms,
-            "Aseos": self.baths,
-            "Superficie": self.size,
-            "Planta": self.floor,
-            "Parking": 1 if self.parking else None,
-            "URL": self.url,
-        }
+        return {column: read(self) for column, read in _CSV_FIELDS}

@@ -8,7 +8,7 @@ target-version = "py39"
 select = ["E", "F", "I", "UP", "B", "SIM", "W"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["dataset", "metrics", "home", "listing", "predict", "prepare_dataset"]
+known-first-party = ["chat", "dataset", "metrics", "home", "listing", "predict", "prepare_dataset"]
 
 [tool.ruff.lint.per-file-ignores]
 # Obsolete from-scratch network: kept as-is on purpose.

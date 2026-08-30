@@ -46,10 +46,9 @@ SEARCH_URL_TEMPLATE = (
 )
 COOKIE_ACCEPT_XPATH = "/html/body/div[3]/div/div/footer/div/button[2]"
 CARD_LINK_CLASS = "re-Card-link"
-DISTRICT_XPATH_TEMPLATE = (
-    "/html/body/div[1]/div[3]/div/div[4]/div[2]/div[1]/main/div[3]/section/article[{index}]"
-    "/div/div[2]/a/div[3]/h3"
-)
+# District label read *relative to each card* (first <h3> inside it), so the link
+# and its district always come from the same node.
+DISTRICT_RELATIVE_XPATH = ".//h3"
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -57,6 +56,7 @@ DEFAULT_USER_AGENT = (
 )
 SCROLL_PAUSE_TIME = 0.5
 PAGE_LOAD_PAUSE = 5
+MAX_SCROLLS = 40
 
 # Madrid districts whose names are more than one word; the card label ends with
 # the last N words instead of just the last one.
@@ -107,20 +107,20 @@ def accept_cookies(driver: webdriver.Firefox, timeout: float = 10) -> None:
 def scroll_to_bottom(driver: webdriver.Firefox, pause: float = SCROLL_PAUSE_TIME) -> None:
     """Scroll down one screen at a time so lazy-loaded cards render."""
     screen_height = driver.execute_script("return window.screen.height;")
-    i = 1
-    while True:
+    last_height = 0
+    for i in range(1, MAX_SCROLLS + 1):
         driver.execute_script(f"window.scrollTo(0, {screen_height} * {i});")
-        i += 1
         time.sleep(pause)
         scroll_height = driver.execute_script("return document.body.scrollHeight;")
-        if screen_height * i > scroll_height:
+        # Stop when we have scrolled past the bottom, or the page stopped growing.
+        if screen_height * i > scroll_height or scroll_height == last_height:
             break
+        last_height = scroll_height
 
 
-def listing_links(driver: webdriver.Firefox) -> list[str]:
-    """Return the href of every listing card on the current results page."""
-    cards = driver.find_elements(By.CLASS_NAME, CARD_LINK_CLASS)
-    return [href for card in cards if (href := card.get_attribute("href"))]
+def card_elements(driver: webdriver.Firefox) -> list:
+    """Return the listing-card elements on the current results page."""
+    return driver.find_elements(By.CLASS_NAME, CARD_LINK_CLASS)
 
 
 def district_from_label(text: str, prefix: str = "") -> str | None:
@@ -137,10 +137,10 @@ def district_from_label(text: str, prefix: str = "") -> str | None:
     return " ".join(tokens[-words:])
 
 
-def district_for(driver: webdriver.Firefox, index: int) -> str | None:
-    """Read the district shown on the ``index``-th card (1-based)."""
+def district_for(card) -> str | None:
+    """Read the district from a single card element."""
     try:
-        label = driver.find_element(By.XPATH, DISTRICT_XPATH_TEMPLATE.format(index=index))
+        label = card.find_element(By.XPATH, DISTRICT_RELATIVE_XPATH)
     except NoSuchElementException:
         return None
 
@@ -167,7 +167,12 @@ def scrape_search(
     delay: float,
     skip_urls: set[str],
 ) -> Iterator[Home]:
-    """Yield the parsed listing for every card across ``pages`` results pages."""
+    """Yield the parsed listing for every card across ``pages`` results pages.
+
+    Listings whose detail page parsed to nothing are logged and skipped (a run
+    that skips *most* listings means the selectors need updating).
+    """
+    empty = 0
     for page in range(start_page, start_page + pages):
         logger.info("Search page %d", page)
         driver.get(SEARCH_URL_TEMPLATE.format(page=page))
@@ -175,20 +180,26 @@ def scrape_search(
         accept_cookies(driver)
         scroll_to_bottom(driver)
 
-        links = listing_links(driver)
-        logger.info("  %d listings", len(links))
-        for index, link in enumerate(links, start=1):
-            if link in skip_urls:
-                logger.debug("  already scraped, skipping %s", link)
+        cards = card_elements(driver)
+        logger.info("  %d listings", len(cards))
+        for card in cards:
+            link = card.get_attribute("href")
+            if not link or link in skip_urls:
                 continue
-            district = district_for(driver, index)
+            district = district_for(card)
             if district is None:
-                logger.debug("  no district for card %d, skipping", index)
+                logger.debug("  no district for %s, skipping", link)
                 continue
             time.sleep(delay)
             home = scrape_listing(session, link, district)
-            if home is not None:
-                yield home
+            if home is None:
+                continue
+            if home.is_empty():
+                empty += 1
+                continue
+            yield home
+    if empty:
+        logger.warning("%d listing(s) parsed with no data - check the CSS/XPath selectors", empty)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

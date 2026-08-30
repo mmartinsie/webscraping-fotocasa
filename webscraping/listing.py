@@ -86,5 +86,8 @@ def scrape_listing(session: requests.Session, url: str, district: str) -> Home |
     _parse_header_features(soup, home)
     _parse_characteristics(soup, home)
 
-    logger.debug("Parsed %s", home)
+    if home.is_empty():
+        logger.warning("No data parsed from %s (selectors may be stale, or the page is JS-only)", url)
+    else:
+        logger.debug("Parsed %s", home)
     return home

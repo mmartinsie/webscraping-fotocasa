@@ -51,4 +51,5 @@ Leading unnamed column = pandas row index. Then:
 | `Colegios` | int | Number of schools near the property (external data). |
 | `Tipo`, `Distrito` | str | Dropped by every model script before training. |
 
-Model scripts fill any missing numeric value with `1`.
+Model scripts (`dataset.load_xy`) fill any missing numeric value with that
+column's median.

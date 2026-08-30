@@ -49,12 +49,13 @@ def clean(
     df["Parking"] = parking.fillna(0).astype(int).clip(0, 1)
 
     df = df.dropna(subset=["Precio", "Superficie"])
+    df = df[df["Superficie"] > 0]
     df = df[df["Precio"].between(min_price, max_price) & df["Superficie"].between(min_size, max_size)]
 
     df["Precio_m2"] = (df["Precio"] / df["Superficie"]).round().astype(int)
 
-    # Keep the whole-number columns as integers (nullable, so blanks stay blank).
-    for column in ["Precio", "Superficie", "Habitaciones", "Aseos", "Planta"]:
+    # Keep the whole-number output columns as integers (nullable, so blanks stay blank).
+    for column in ["Precio", "Superficie", "Habitaciones", "Aseos"]:
         df[column] = df[column].astype("Int64")
 
     df = df.drop_duplicates()
@@ -68,7 +69,9 @@ def attach_schools(df: pd.DataFrame, schools_csv: str | None) -> pd.DataFrame:
     schools = pd.read_csv(schools_csv)
     if {"Distrito", "Colegios"} - set(schools.columns):
         raise SystemExit("--schools CSV must have columns: Distrito, Colegios")
-    return df.merge(schools[["Distrito", "Colegios"]], on="Distrito", how="left")
+    # One row per district, so the left-join can't multiply rows.
+    schools = schools[["Distrito", "Colegios"]].drop_duplicates("Distrito")
+    return df.merge(schools, on="Distrito", how="left")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

@@ -1,7 +1,8 @@
 """Conversational price estimator.
 
-Claude chats with you, collects the flat's five features and calls the saved
-model to give you a recommended price.
+Claude chats with you, collects the flat's features and calls the saved model to
+give you a recommended price. The questions and the tool are built from the saved
+bundle, so a model retrained on different features just works.
 
     python recommend_price.py --save model_dir     # once: train + save the model
     export ANTHROPIC_API_KEY=sk-ant-...            # or: ant auth login
@@ -16,63 +17,58 @@ import argparse
 import json
 import os
 
-import anthropic
-
-from predict import load_bundle, predict_price
+from predict import BundleError, load_bundle, predict_price
 
 DEFAULT_MODEL = "claude-opus-5"
 MAX_TOKENS = 16000
 
-# The tool feeds these dataset column names; keep them in sync with dataset.FEATURES.
-FEATURE_MAP = {
-    "habitaciones": "Habitaciones",
-    "aseos": "Aseos",
-    "superficie": "Superficie",
-    "parking": "Parking",
-    "colegios": "Colegios",
-}
-
-SYSTEM = """You help a user estimate the sale price of a flat in Madrid.
+SYSTEM_TEMPLATE = """You help a user estimate the sale price of a flat in Madrid.
 
 Converse in the user's language (Spanish by default). Keep replies short.
 
-Before you can give a price you need these five values:
-- habitaciones: number of rooms (integer)
-- aseos: number of bathrooms (integer)
-- superficie: floor area in m2 (number)
-- parking: 1 if the flat has parking, else 0
-- colegios: number of schools nearby. If the user does not know, use 9
-  (the dataset median) and say so.
+Before you can give a price you need these values (with the dataset median as a
+fallback if the user does not know one):
+{feature_lines}
 
-Ask for whatever is missing, a couple of items at a time, and accept values
-given in any order or all at once. When you have all five, briefly echo them
-back, then call the predict_price tool exactly once. Report the returned figure
-in euros and make clear it is a rough model estimate, not a professional
-appraisal."""
+Ask for whatever is missing, a couple of items at a time, and accept values in
+any order or all at once. When you have them, briefly echo them back, then call
+the predict_price tool exactly once. Report the returned figure in euros and make
+clear it is a rough model estimate, not a professional appraisal."""
 
-TOOL = {
-    "name": "predict_price",
-    "description": "Estimate the flat's sale price. Call once all five features are known.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "habitaciones": {"type": "integer", "description": "number of rooms"},
-            "aseos": {"type": "integer", "description": "number of bathrooms"},
-            "superficie": {"type": "number", "description": "floor area in m2"},
-            "parking": {"type": "integer", "enum": [0, 1]},
-            "colegios": {"type": "number", "description": "schools nearby (default 9)"},
+
+def build_tool(features: list[str]) -> dict:
+    """A predict_price tool whose schema mirrors the model's feature list."""
+    properties = {}
+    for name in features:
+        if name.lower() in ("parking", "garaje"):
+            properties[name] = {"type": "integer", "enum": [0, 1]}
+        else:
+            properties[name] = {"type": "number"}
+    return {
+        "name": "predict_price",
+        "description": "Estimate the flat's sale price once the features are known.",
+        "input_schema": {
+            "type": "object",
+            "properties": properties,
+            "required": features,
+            "additionalProperties": False,
         },
-        "required": ["habitaciones", "aseos", "superficie", "parking", "colegios"],
-        "additionalProperties": False,
-    },
-}
+    }
+
+
+def build_system(metadata: dict) -> str:
+    medians = metadata.get("feature_medians", {})
+    lines = "\n".join(f"- {name} (median {medians.get(name, 'n/a')})" for name in metadata["features"])
+    return SYSTEM_TEMPLATE.format(feature_lines=lines)
 
 
 def run_tool(bundle: tuple, tool_input: dict) -> dict:
-    model, scaler, metadata = bundle
-    flat = {FEATURE_MAP[k]: v for k, v in tool_input.items() if k in FEATURE_MAP}
-    price = predict_price(model, scaler, metadata, flat)
-    return {"price_eur": round(price), "features": flat}
+    try:
+        model, scaler, metadata = bundle
+        price = predict_price(model, scaler, metadata, {k: float(v) for k, v in tool_input.items()})
+        return {"price_eur": round(price)}
+    except Exception as exc:  # surface the failure to Claude instead of crashing
+        return {"error": f"{type(exc).__name__}: {exc}"}
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -89,8 +85,16 @@ def main(argv: list[str] | None = None) -> int:
             f"No model bundle at {args.model_dir!r}. "
             f"Create one with:  python recommend_price.py --save {args.model_dir}"
         )
+    try:
+        bundle = load_bundle(args.model_dir)
+    except BundleError as exc:
+        raise SystemExit(str(exc)) from exc
+    _, _, metadata = bundle
 
-    bundle = load_bundle(args.model_dir)
+    import anthropic
+
+    tool = build_tool(metadata["features"])
+    system = build_system(metadata)
     client = anthropic.Anthropic()
     messages: list[dict] = []
 
@@ -108,13 +112,12 @@ def main(argv: list[str] | None = None) -> int:
 
         messages.append({"role": "user", "content": user})
 
-        # Inner loop: keep going while Claude wants to call the tool.
-        while True:
+        while True:  # keep going while Claude wants to call the tool
             response = client.messages.create(
                 model=args.model,
                 max_tokens=MAX_TOKENS,
-                system=SYSTEM,
-                tools=[TOOL],
+                system=system,
+                tools=[tool],
                 messages=messages,
             )
             messages.append({"role": "assistant", "content": response.content})
@@ -129,15 +132,19 @@ def main(argv: list[str] | None = None) -> int:
             if response.stop_reason != "tool_use":
                 break
 
-            tool_results = [
-                {
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": json.dumps(run_tool(bundle, block.input)),
-                }
-                for block in response.content
-                if block.type == "tool_use"
-            ]
+            tool_results = []
+            for block in response.content:
+                if block.type != "tool_use":
+                    continue
+                result = run_tool(bundle, block.input)
+                tool_results.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": json.dumps(result),
+                        "is_error": "error" in result,
+                    }
+                )
             messages.append({"role": "user", "content": tool_results})
 
     return 0

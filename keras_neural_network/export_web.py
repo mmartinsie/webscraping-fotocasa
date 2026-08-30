@@ -38,9 +38,10 @@ def export(model_dir: str, output: str) -> None:
 
     band = metadata.get("price_band", {})
     cfg = metadata.get("configuration", {})
-    m = metadata.get("test_metrics", {})
+    m = metadata.get("cv_metrics") or metadata.get("test_metrics", {})
     bundle = {
         "features": metadata["features"],
+        "feature_medians": metadata.get("feature_medians", {}),
         "scaler": {"mean": scaler.mean_.tolist(), "scale": scaler.scale_.tolist()},
         "band": {"low": band.get("low"), "high": band.get("high")},
         "layers": layers,
