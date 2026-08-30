@@ -1,0 +1,6 @@
+# Theme for the Streamlit Community Cloud deployment (webapp/streamlit_app.py).
+# Only `primaryColor` and `font` are set so dark-mode visitors keep their
+# background; everything else follows the viewer's light/dark preference.
+[theme]
+primaryColor = "#2f6bff"
+font = "sans serif"

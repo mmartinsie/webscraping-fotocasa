@@ -39,20 +39,30 @@ RANGE_PCT = 0.15  # +/- band shown around the point estimate
 
 st.set_page_config(page_title="Madrid flat price chat", page_icon="🏠")
 
-# Light visual polish. Streamlit's internal class names are unstable, so this
-# sticks to documented [data-testid] hooks and plain element selectors.
+# Visual polish. Streamlit's internal class names are unstable, so this sticks
+# to documented [data-testid] hooks and plain element selectors; the accent
+# colour and font come from .streamlit/config.toml.
 st.markdown(
     """
     <style>
       [data-testid="stToolbar"], [data-testid="stDecoration"], #MainMenu, footer { display: none; }
-      .block-container { padding-top: 2.2rem; padding-bottom: 3rem; max-width: 760px; }
-      h1 { font-weight: 650; letter-spacing: -.01em; }
-      [data-testid="stCaptionContainer"] { color: #6b7280; }
+      .block-container { padding-top: 2.4rem; padding-bottom: 3rem; max-width: 780px; }
+
+      /* Header band: the app title + tagline sit in their own card. */
+      .app-header { margin-bottom: 1.4rem; padding-bottom: 1.1rem;
+        border-bottom: 1px solid rgba(128,128,128,.18); }
+      .app-header h1 { margin: 0; font-size: 1.55rem; font-weight: 680; letter-spacing: -.015em; }
+      .app-header p { margin: .35rem 0 0; color: #6b7280; font-size: .9rem; }
+
       [data-testid="stMetricValue"] { font-variant-numeric: tabular-nums; }
-      .stButton > button, .stFormSubmitButton > button { border-radius: 9px; font-weight: 600; }
-      [data-testid="stChatMessage"] { border: 1px solid rgba(128,128,128,.16); border-radius: 12px; }
-      .stTabs [data-baseweb="tab-list"] { gap: .25rem; }
       [data-testid="stSidebar"] [data-testid="stMetricValue"] { font-size: 1.05rem; }
+      .stButton > button, .stFormSubmitButton > button {
+        border-radius: 9px; font-weight: 600; transition: transform .06s; }
+      .stButton > button:active, .stFormSubmitButton > button:active { transform: translateY(1px); }
+      [data-testid="stChatMessage"] {
+        border: 1px solid rgba(128,128,128,.16); border-radius: 12px; }
+      [data-testid="stForm"] { border-radius: 14px; }
+      .stTabs [data-baseweb="tab-list"] { gap: .25rem; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -256,8 +266,10 @@ with st.sidebar:
     language = st.radio("Language / Idioma", list(STR), horizontal=True)
 t = STR[language]
 
-st.title(t["title"])
-st.caption(t["caption"])
+st.markdown(
+    f'<div class="app-header"><h1>{t["title"]}</h1><p>{t["caption"]}</p></div>',
+    unsafe_allow_html=True,
+)
 
 api_key = _from_secret_or_env("GEMINI_API_KEY")
 if not api_key:
