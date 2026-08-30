@@ -1,3 +1,4 @@
+# For local dev. Streamlit Community Cloud uses the copy at the repo root.
 streamlit>=1.31
 google-generativeai>=0.8
 numpy>=1.26

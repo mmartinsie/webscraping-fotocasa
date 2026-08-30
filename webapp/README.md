@@ -44,6 +44,10 @@ a key of their own.
 
 4. Deploy. It redeploys automatically on every push.
 
+Streamlit Cloud only installs from a `requirements.txt` at the **repo root**
+(this repo has one that mirrors `webapp/requirements.txt`); without it the app
+fails with an `ImportError` on `numpy` / `google-generativeai`.
+
 ## Run locally
 
 ```bash
