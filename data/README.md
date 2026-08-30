@@ -14,3 +14,11 @@ Used by `webapp/pricing.py` (`estimate_by_district`) and, as `docs/districts.jso
 by the browser demo. It gives the location + "current price level" signal that
 the thesis neural network (trained on ~2020 data, district dropped) does not
 have.
+
+## `colegios_distrito.csv`
+
+Number of nearby schools per district, taken from the thesis dataset (the value
+is constant within each district there, so it's really a district attribute).
+Both demos look this up from the district instead of asking the user for it, and
+feed it to the neural network. `export_web.py` merges it into `districts.json` as
+`{"District": {"eur_m2": ..., "colegios": ...}}`.

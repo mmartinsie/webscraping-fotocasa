@@ -18,12 +18,20 @@ import os
 
 from predict import load_bundle, predict_price
 
-DISTRICT_CSV = os.path.join(os.path.dirname(__file__), "..", "data", "precio_m2_distrito.csv")
+_DATA = os.path.join(os.path.dirname(__file__), "..", "data")
+DISTRICT_CSV = os.path.join(_DATA, "precio_m2_distrito.csv")
+SCHOOLS_CSV = os.path.join(_DATA, "colegios_distrito.csv")
+
+
+def _read(path: str, value_col: str) -> dict:
+    with open(path, encoding="utf-8", newline="") as handle:
+        return {row["Distrito"]: float(row[value_col]) for row in csv.DictReader(handle)}
 
 
 def write_districts(output_dir: str) -> None:
-    with open(DISTRICT_CSV, encoding="utf-8", newline="") as handle:
-        table = {row["Distrito"]: float(row["EurM2"]) for row in csv.DictReader(handle)}
+    eur_m2 = _read(DISTRICT_CSV, "EurM2")
+    schools = _read(SCHOOLS_CSV, "Colegios")
+    table = {name: {"eur_m2": eur_m2[name], "colegios": schools.get(name)} for name in eur_m2}
     path = os.path.join(output_dir, "districts.json")
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(table, handle, ensure_ascii=False, indent=2)

@@ -125,9 +125,6 @@
       <label for="Superficie" data-i18n-html="lblSize"></label>
       <input type="number" id="Superficie" min="15" step="1" value="90" required>
 
-      <label for="Colegios" data-i18n-html="lblSchools"></label>
-      <input type="number" id="Colegios" min="0" step="1" value="9" required>
-
       <div class="check">
         <input type="checkbox" id="Parking">
         <label for="Parking" data-i18n="lblParking"></label>
@@ -159,7 +156,6 @@ const T = {
     lblRooms: "Rooms",
     lblBaths: "Bathrooms",
     lblSize: 'Floor area <span class="hint">(m²)</span>',
-    lblSchools: 'Nearby schools <span class="hint">(leave 9 if unknown)</span>',
     lblParking: "Has a parking space",
     btnCalc: "Estimate price",
     btnLoading: "Loading…",
@@ -169,7 +165,7 @@ const T = {
       + '<code>python -m http.server</code>): <code>file://</code> cannot load the JSON.',
     about: (cfg, mae) => `Thesis reference: ${cfg} · mean error ≈ ${mae} · ~2020 data`,
     note: (d, m2, pk) => `${d} · ${m2} €/m²` + (pk ? " · +6% parking" : ""),
-    nn: (p) => `Thesis neural network (~2020 data): ${p}`,
+    nn: (p, sc) => `Thesis neural network (~2020 data): ${p} · ${sc} schools (by district)`,
     locale: "en-GB",
   },
   es: {
@@ -181,7 +177,6 @@ const T = {
     lblRooms: "Habitaciones",
     lblBaths: "Aseos",
     lblSize: 'Superficie <span class="hint">(m²)</span>',
-    lblSchools: 'Colegios cercanos <span class="hint">(si no lo sabes, deja 9)</span>',
     lblParking: "Tiene plaza de parking",
     btnCalc: "Calcular precio",
     btnLoading: "Cargando…",
@@ -191,7 +186,7 @@ const T = {
       + '<code>python -m http.server</code>): <code>file://</code> no permite cargar los JSON.',
     about: (cfg, mae) => `Referencia TFM: ${cfg} · error medio ≈ ${mae} · datos ~2020`,
     note: (d, m2, pk) => `${d} · ${m2} €/m²` + (pk ? " · +6% parking" : ""),
-    nn: (p) => `Red neuronal TFM (datos ~2020): ${p}`,
+    nn: (p, sc) => `Red neuronal TFM (datos ~2020): ${p} · ${sc} colegios (por distrito)`,
     locale: "es-ES",
   },
 };
@@ -225,12 +220,18 @@ function eur(n) {
   return fmt(n) + " €";
 }
 
-function districtAvg() {
-  const v = Object.values(D);
+function avg(key) {
+  const v = Object.values(D).map((d) => d[key]);
   return v.reduce((a, b) => a + b, 0) / v.length;
 }
+function districtEurM2(district) {
+  return (D && D[district] && D[district].eur_m2) || avg("eur_m2");
+}
+function districtSchools(district) {
+  return Math.round((D && D[district] && D[district].colegios) ?? avg("colegios"));
+}
 function districtEstimate(district, superficie, parking) {
-  const eurM2 = (D && D[district]) || districtAvg();
+  const eurM2 = districtEurM2(district);
   return { price: eurM2 * superficie * (parking ? PARKING_PREMIUM : 1), eurM2 };
 }
 
@@ -256,10 +257,10 @@ function renderDistricts() {
   if (!D) return;
   const current = select.value;
   select.innerHTML = "";
-  Object.entries(D).sort((a, b) => b[1] - a[1]).forEach(([name, v]) => {
+  Object.entries(D).sort((a, b) => b[1].eur_m2 - a[1].eur_m2).forEach(([name, d]) => {
     const opt = document.createElement("option");
     opt.value = name;
-    opt.textContent = `${name} — ${fmt(v)} €/m²`;
+    opt.textContent = `${name} — ${fmt(d.eur_m2)} €/m²`;
     select.appendChild(opt);
   });
   if (current) select.value = current;
@@ -291,10 +292,10 @@ function render() {
   }
   renderDistricts();
   if (lastResult) {
-    const { district, eurM2, parking, distPrice, nnPrice } = lastResult;
+    const { district, eurM2, parking, distPrice, nnPrice, schools } = lastResult;
     document.getElementById("price").textContent = eur(distPrice);
     document.getElementById("note").textContent = t.note(district, fmt(eurM2), parking);
-    document.getElementById("nn").textContent = t.nn(eur(nnPrice));
+    document.getElementById("nn").textContent = t.nn(eur(nnPrice), schools);
   }
 }
 
@@ -312,14 +313,16 @@ document.getElementById("form").addEventListener("submit", (ev) => {
   const parking = document.getElementById("Parking").checked ? 1 : 0;
 
   const { price: distPrice, eurM2 } = districtEstimate(district, superficie, parking);
+  const schools = districtSchools(district);
   const nnValues = M.features.map((name) => {
+    if (name === "Colegios") return schools;
     const el = document.getElementById(name);
     if (!el) return 0;
     return el.type === "checkbox" ? (el.checked ? 1 : 0) : parseFloat(el.value || "0");
   });
   const nnPrice = predict(nnValues);
 
-  lastResult = { district, eurM2, parking, distPrice, nnPrice };
+  lastResult = { district, eurM2, parking, distPrice, nnPrice, schools };
   document.getElementById("result").hidden = false;
   render();
 });

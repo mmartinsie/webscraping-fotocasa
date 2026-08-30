@@ -22,7 +22,14 @@ import time
 import google.generativeai as genai
 import streamlit as st
 
-from pricing import estimate_by_district, load_districts, load_model, predict_price
+from pricing import (
+    district_schools,
+    estimate_by_district,
+    load_district_schools,
+    load_districts,
+    load_model,
+    predict_price,
+)
 
 # gemini-*-lite models get the most generous free-tier request quota, which
 # matters here: automatic function calling makes 2-3 API calls per user turn.
@@ -33,13 +40,14 @@ MAX_RETRIES = 2
 st.set_page_config(page_title="Madrid flat price chat", page_icon="🏠")
 MODEL = load_model()
 DISTRICTS = load_districts()
+DISTRICT_SCHOOLS = load_district_schools()
 
 SYSTEM = (
     "You help estimate the sale price of a flat in Madrid. Reply in the same "
     "language the user writes in (English or Spanish); keep answers short. You "
     "need: the Madrid district, number of rooms, number of bathrooms, floor area "
-    "in m2, whether it has parking (yes/no) and how many schools are nearby (if "
-    f"the user doesn't know, use 9 and say so). Valid districts: {', '.join(DISTRICTS)}. "
+    "in m2, and whether it has parking (yes/no). The number of nearby schools is "
+    f"derived from the district automatically. Valid districts: {', '.join(DISTRICTS)}. "
     "Ask for whatever is missing, accept values in any order, and once you have "
     "them all call the estimate_price function. Report the euro figures: the main "
     "one (district €/m2, ~2024 prices) and mention the thesis neural-network "
@@ -86,9 +94,7 @@ STR = {
 }
 
 
-def estimate_price(
-    district: str, rooms: int, bathrooms: int, area_m2: float, parking: int, schools: int
-) -> dict:
+def estimate_price(district: str, rooms: int, bathrooms: int, area_m2: float, parking: int) -> dict:
     """Estimate the sale price of a flat in Madrid.
 
     Args:
@@ -97,9 +103,9 @@ def estimate_price(
         bathrooms: number of bathrooms.
         area_m2: floor area in square metres.
         parking: 1 if it has a parking space, 0 otherwise.
-        schools: number of nearby schools (use 9 if unknown).
     """
     by_district = estimate_by_district(DISTRICTS, district, area_m2, parking)
+    schools = district_schools(DISTRICT_SCHOOLS, district)
     nn_price = predict_price(
         MODEL,
         {
@@ -113,6 +119,7 @@ def estimate_price(
     return {
         "price_eur": by_district["price_eur"],
         "method": f"{by_district['distrito']} at {by_district['eur_m2']:,} €/m² (~2024)",
+        "schools_by_district": schools,
         "reference_neural_network_2020_eur": round(nn_price),
     }
 

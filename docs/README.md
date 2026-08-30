@@ -2,10 +2,11 @@
 
 `index.html` is a single static page (English / Spanish toggle) that estimates a
 Madrid flat's price. It leads with `district €/m² × m²` from `districts.json`
-(~2024 figures) and shows the thesis network's number as a reference. The network
-is tiny, so `model.json` carries the raw weights + `StandardScaler` stats + the
-price-clip band, and the page runs the forward pass in plain JavaScript (no
-TensorFlow.js).
+(`{eur_m2, colegios}` per district, ~2024 figures) and shows the thesis network's
+number as a reference; the school count fed to the network is taken from the
+district, not entered by the user. The network is tiny, so `model.json` carries
+the raw weights + `StandardScaler` stats + the price-clip band, and the page runs
+the forward pass in plain JavaScript (no TensorFlow.js).
 
 ## Regenerate `model.json` / `districts.json`
 

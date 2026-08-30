@@ -9,6 +9,9 @@ Two estimates:
   NumPy (no TensorFlow, fast cold start). Trained on ~2020 data with the district
   dropped; kept as a secondary reference number.
 
+``Colegios`` (nearby schools) is a district-level attribute in the thesis data,
+so it is looked up from ``data/colegios_distrito.csv`` rather than asked for.
+
 The NumPy forward pass matches ``keras_neural_network/predict.py`` and the
 JavaScript in ``docs/index.html``.
 """
@@ -25,35 +28,52 @@ import numpy as np
 _ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MODEL_JSON = _ROOT / "docs" / "model.json"
 DEFAULT_DISTRICT_CSV = _ROOT / "data" / "precio_m2_distrito.csv"
+DEFAULT_SCHOOLS_CSV = _ROOT / "data" / "colegios_distrito.csv"
 
 PARKING_PREMIUM = 1.06  # a parking space adds roughly 6% to the price
 
 
 # --------------------------------------------------------------------------- #
-# District €/m² estimate
+# Per-district reference tables
 # --------------------------------------------------------------------------- #
 def _norm(text: str) -> str:
     text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
     return text.strip().lower()
 
 
-def load_districts(path: str | Path = DEFAULT_DISTRICT_CSV) -> dict[str, float]:
-    """Return ``{district name: €/m²}`` from the reference CSV."""
+def _load_table(path: str | Path, value_col: str) -> dict[str, float]:
     with open(path, encoding="utf-8", newline="") as handle:
-        return {row["Distrito"]: float(row["EurM2"]) for row in csv.DictReader(handle)}
+        return {row["Distrito"]: float(row[value_col]) for row in csv.DictReader(handle)}
+
+
+def _lookup(table: dict[str, float], distrito: str | None) -> tuple[float, str]:
+    """Accent/case-insensitive lookup; falls back to the table average."""
+    average = sum(table.values()) / len(table)
+    if distrito:
+        target = _norm(distrito)
+        for name, value in table.items():
+            if _norm(name) == target or target in _norm(name) or _norm(name) in target:
+                return value, name
+    return average, "media de Madrid"
+
+
+def load_districts(path: str | Path = DEFAULT_DISTRICT_CSV) -> dict[str, float]:
+    """Return ``{district name: €/m²}``."""
+    return _load_table(path, "EurM2")
+
+
+def load_district_schools(path: str | Path = DEFAULT_SCHOOLS_CSV) -> dict[str, float]:
+    """Return ``{district name: nearby schools}`` (from the thesis dataset)."""
+    return _load_table(path, "Colegios")
 
 
 def district_eur_m2(districts: dict[str, float], distrito: str | None) -> tuple[float, str]:
-    """Look up €/m² for ``distrito`` (accent/case-insensitive). Falls back to the
-    table average. Returns ``(€/m², matched name)``."""
-    average = sum(districts.values()) / len(districts)
-    if not distrito:
-        return average, "media de Madrid"
-    target = _norm(distrito)
-    for name, value in districts.items():
-        if _norm(name) == target or target in _norm(name) or _norm(name) in target:
-            return value, name
-    return average, "media de Madrid"
+    return _lookup(districts, distrito)
+
+
+def district_schools(schools: dict[str, float], distrito: str | None) -> float:
+    """Nearby-school count for ``distrito`` (average if unknown)."""
+    return round(_lookup(schools, distrito)[0])
 
 
 def estimate_by_district(

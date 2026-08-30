@@ -5,7 +5,9 @@ import pytest
 
 from pricing import (
     district_eur_m2,
+    district_schools,
     estimate_by_district,
+    load_district_schools,
     load_districts,
     load_model,
     predict_price,
@@ -90,3 +92,23 @@ def test_expensive_district_costs_more(districts):
     salamanca = estimate_by_district(districts, "Salamanca", 90)["price_eur"]
     villaverde = estimate_by_district(districts, "Villaverde", 90)["price_eur"]
     assert salamanca > 2 * villaverde
+
+
+# --- schools automated from district -------------------------------------- #
+
+
+def test_school_table_matches_district_table():
+    assert set(load_district_schools()) == set(load_districts())
+
+
+def test_district_schools_lookup():
+    schools = load_district_schools()
+    assert district_schools(schools, "Salamanca") == 3
+    assert district_schools(schools, "puente de vallecas") == 25
+
+
+def test_unknown_district_schools_falls_back_to_average():
+    schools = load_district_schools()
+    expected = round(sum(schools.values()) / len(schools))
+    assert district_schools(schools, None) == expected
+    assert district_schools(schools, "Narnia") == expected
