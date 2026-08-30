@@ -18,8 +18,9 @@ import streamlit as st
 
 from pricing import load_model, predict_price
 
-# gemini-1.5-flash is in the free tier; swap for gemini-2.0-flash if you prefer.
-GEMINI_MODEL = "gemini-1.5-flash"
+# Free-tier chat model. Override with a GEMINI_MODEL secret / env var if this one
+# is retired (older names like gemini-1.5-flash now 404 on the public API).
+DEFAULT_GEMINI_MODEL = "gemini-2.0-flash"
 
 st.set_page_config(page_title="Tasador conversacional", page_icon="🏠")
 MODEL = load_model()
@@ -58,13 +59,25 @@ def estimar_precio(habitaciones: int, aseos: int, superficie: float, parking: in
     return {"precio_estimado_eur": round(price)}
 
 
-def get_api_key() -> str | None:
+def _from_secret_or_env(name: str) -> str | None:
     try:
-        if "GEMINI_API_KEY" in st.secrets:
-            return st.secrets["GEMINI_API_KEY"]
+        if name in st.secrets:
+            return st.secrets[name]
     except Exception:  # no secrets.toml at all
         pass
-    return os.environ.get("GEMINI_API_KEY")
+    return os.environ.get(name)
+
+
+def available_models() -> list[str]:
+    """Model names that support generateContent, for a helpful error message."""
+    try:
+        return [
+            m.name.removeprefix("models/")
+            for m in genai.list_models()
+            if "generateContent" in getattr(m, "supported_generation_methods", [])
+        ]
+    except Exception:
+        return []
 
 
 st.title("🏠 Tasador conversacional de pisos")
@@ -73,15 +86,24 @@ st.caption(
     f"error medio ≈ {MODEL['meta'].get('mae', 0):,.0f} € · estimación aproximada"
 )
 
-api_key = get_api_key()
+api_key = _from_secret_or_env("GEMINI_API_KEY")
 if not api_key:
     st.error("Falta `GEMINI_API_KEY` (secret de la app o variable de entorno).")
     st.stop()
 genai.configure(api_key=api_key)
 
+model_name = _from_secret_or_env("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL
+
 if "chat" not in st.session_state:
-    model = genai.GenerativeModel(GEMINI_MODEL, system_instruction=SYSTEM, tools=[estimar_precio])
-    st.session_state.chat = model.start_chat(enable_automatic_function_calling=True)
+    try:
+        model = genai.GenerativeModel(model_name, system_instruction=SYSTEM, tools=[estimar_precio])
+        st.session_state.chat = model.start_chat(enable_automatic_function_calling=True)
+    except Exception as exc:
+        st.error(f"No se pudo cargar el modelo `{model_name}`: {exc}")
+        models = available_models()
+        if models:
+            st.info("Modelos disponibles con tu clave:\n\n- " + "\n- ".join(models))
+        st.stop()
 chat = st.session_state.chat
 
 for message in chat.history:
@@ -98,6 +120,10 @@ if prompt := st.chat_input("Cuéntame sobre el piso…"):
         with st.spinner("Pensando…"):
             try:
                 answer = chat.send_message(prompt).text
-            except Exception as exc:  # network / quota / API errors
+            except Exception as exc:  # network / quota / API / bad-model errors
                 answer = f"Error al hablar con Gemini: {exc}"
+                if "404" in str(exc) or "not found" in str(exc).lower():
+                    models = available_models()
+                    if models:
+                        answer += "\n\nModelos disponibles: " + ", ".join(models)
         st.write(answer)

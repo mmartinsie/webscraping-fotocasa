@@ -32,7 +32,8 @@ GEMINI_API_KEY=AIza... streamlit run webapp/streamlit_app.py
 - The tool's parameters (`habitaciones`, `aseos`, `superficie`, `parking`,
   `colegios`) are fixed to the current `docs/model.json` feature set. If you
   retrain with different features, update `estimar_precio` and `SYSTEM`.
-- Model is `gemini-1.5-flash`; change `GEMINI_MODEL` for another (e.g.
-  `gemini-2.0-flash`).
+- Model defaults to `gemini-2.0-flash`. Older names (`gemini-1.5-flash`) now 404
+  on the public API. Override without a code change by adding a `GEMINI_MODEL`
+  secret / env var; on a 404 the app lists the models your key can use.
 - `pricing.predict_price` is covered by `tests/test_pricing.py`; the Streamlit +
   Gemini glue is not unit-tested (needs the runtime and a live key).
