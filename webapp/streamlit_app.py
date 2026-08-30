@@ -39,6 +39,25 @@ RANGE_PCT = 0.15  # +/- band shown around the point estimate
 
 st.set_page_config(page_title="Madrid flat price chat", page_icon="🏠")
 
+# Light visual polish. Streamlit's internal class names are unstable, so this
+# sticks to documented [data-testid] hooks and plain element selectors.
+st.markdown(
+    """
+    <style>
+      [data-testid="stToolbar"], [data-testid="stDecoration"], #MainMenu, footer { display: none; }
+      .block-container { padding-top: 2.2rem; padding-bottom: 3rem; max-width: 760px; }
+      h1 { font-weight: 650; letter-spacing: -.01em; }
+      [data-testid="stCaptionContainer"] { color: #6b7280; }
+      [data-testid="stMetricValue"] { font-variant-numeric: tabular-nums; }
+      .stButton > button, .stFormSubmitButton > button { border-radius: 9px; font-weight: 600; }
+      [data-testid="stChatMessage"] { border: 1px solid rgba(128,128,128,.16); border-radius: 12px; }
+      .stTabs [data-baseweb="tab-list"] { gap: .25rem; }
+      [data-testid="stSidebar"] [data-testid="stMetricValue"] { font-size: 1.05rem; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 SYSTEM = (
     "You help estimate the sale price of flats in Madrid. Reply in the same "
     "language the user writes in (English or Spanish); keep answers short. "

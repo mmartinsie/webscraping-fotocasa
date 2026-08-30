@@ -4,139 +4,198 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Madrid flat price estimator</title>
+<meta name="description" content="Estimate the sale price of a flat in Madrid — runs entirely in your browser.">
 <style>
   :root {
     color-scheme: light dark;
-    --bg: #f4f4f5;
-    --card: #ffffff;
-    --fg: #18181b;
-    --muted: #71717a;
-    --border: #d4d4d8;
-    --accent: #2563eb;
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #f1f3f5;
+    --fg: #1c1e21;
+    --muted: #6b7280;
+    --border: #e3e6ea;
+    --accent: #2f6bff;
+    --accent-weak: #eaf0ff;
     --accent-fg: #ffffff;
+    --good: #17b26a;
+    --danger: #e5484d;
+    --shadow: 0 1px 2px rgba(16,24,40,.04), 0 12px 32px -12px rgba(16,24,40,.12);
+    --radius: 14px;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #18181b;
-      --card: #27272a;
-      --fg: #f4f4f5;
-      --muted: #a1a1aa;
-      --border: #3f3f46;
-      --accent: #3b82f6;
-      --accent-fg: #ffffff;
+      --bg: #0f1115;
+      --surface: #171a20;
+      --surface-2: #1e222a;
+      --fg: #e9eaec;
+      --muted: #9aa1ac;
+      --border: #2a2f3a;
+      --accent: #5b8bff;
+      --accent-weak: #1b2333;
+      --accent-fg: #0f1115;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 16px 40px -16px rgba(0,0,0,.6);
     }
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    padding: 2rem 1rem;
+    padding: clamp(1.25rem, 4vw, 3rem) 1rem 3rem;
     background: var(--bg);
     color: var(--fg);
-    font: 16px/1.55 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
     display: flex;
     justify-content: center;
   }
-  .wrap { width: 100%; max-width: 460px; }
-  .topbar { display: flex; justify-content: flex-end; margin-bottom: .4rem; }
+  .wrap { width: 100%; max-width: 480px; }
+
+  header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+  .brand { display: flex; align-items: center; gap: .6rem; }
+  .brand .mark {
+    width: 34px; height: 34px; flex: none; border-radius: 9px;
+    background: var(--accent); color: var(--accent-fg);
+    display: grid; place-items: center; font-size: 1.05rem;
+  }
+  h1 { font-size: 1.15rem; font-weight: 650; margin: 0; letter-spacing: -.01em; }
+  .subtitle { color: var(--muted); font-size: .82rem; margin: .1rem 0 0; }
   .lang {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    border-radius: 6px;
-    padding: .15rem .5rem;
-    font-size: .8rem;
-    cursor: pointer;
-    width: auto;
-    margin: 0;
+    flex: none; background: var(--surface); border: 1px solid var(--border);
+    color: var(--muted); border-radius: 999px; padding: .3rem .7rem;
+    font: inherit; font-size: .78rem; font-weight: 600; cursor: pointer;
   }
-  h1 { font-size: 1.4rem; margin: 0 0 .3rem; }
-  .lede { color: var(--muted); margin: 0 0 1.5rem; font-size: .95rem; }
+  .lang:hover { color: var(--fg); }
+
   .card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.25rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: clamp(1.1rem, 3.5vw, 1.5rem);
   }
-  label { display: block; margin: .9rem 0 .3rem; font-weight: 600; font-size: .9rem; }
-  form label:first-of-type { margin-top: 0; }
+
+  form { display: grid; gap: 1rem; }
+  .field { display: grid; gap: .35rem; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  label { font-weight: 600; font-size: .8rem; color: var(--fg); }
   .hint { font-weight: 400; color: var(--muted); }
   input[type="number"], select {
-    width: 100%;
-    padding: .55rem .65rem;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg);
-    color: var(--fg);
-    font: inherit;
+    width: 100%; padding: .6rem .7rem;
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--bg); color: var(--fg); font: inherit;
+    transition: border-color .12s, box-shadow .12s;
   }
-  .check { display: flex; align-items: center; gap: .5rem; margin-top: .9rem; }
-  .check label { margin: 0; }
+  input[type="number"]:focus, select:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-weak);
+  }
+  .check {
+    display: flex; align-items: center; gap: .6rem;
+    padding: .55rem .7rem; border: 1px solid var(--border); border-radius: 10px;
+    background: var(--bg); cursor: pointer; user-select: none;
+  }
+  .check input { width: 1.05rem; height: 1.05rem; accent-color: var(--accent); }
+  .check label { cursor: pointer; }
+
   button[type="submit"] {
-    margin-top: 1.3rem;
-    width: 100%;
-    padding: .7rem;
-    border: 0;
-    border-radius: 8px;
-    background: var(--accent);
-    color: var(--accent-fg);
-    font: 600 1rem system-ui, sans-serif;
-    cursor: pointer;
+    margin-top: .2rem; width: 100%; padding: .8rem; border: 0; border-radius: 10px;
+    background: var(--accent); color: var(--accent-fg);
+    font: inherit; font-size: .95rem; font-weight: 650; cursor: pointer;
+    transition: filter .12s, transform .06s;
   }
-  button:disabled { opacity: .5; cursor: default; }
+  button[type="submit"]:hover:not(:disabled) { filter: brightness(1.05); }
+  button[type="submit"]:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { opacity: .55; cursor: default; }
+
   .result {
-    margin-top: 1.3rem;
-    padding: 1rem;
-    border-radius: 10px;
-    background: var(--bg);
-    border: 1px dashed var(--border);
-    text-align: center;
+    margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--border);
   }
-  .price { font-size: 1.9rem; font-weight: 700; }
-  .result small { color: var(--muted); display: block; margin-top: .3rem; }
-  .about, footer {
-    margin-top: 1.1rem;
-    font-size: .8rem;
-    color: var(--muted);
+  @media (prefers-reduced-motion: no-preference) {
+    .result:not([hidden]) { animation: rise .28s ease both; }
   }
-  footer a { color: var(--accent); }
-  .err { color: #dc2626; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+  .result .eyebrow { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .price { font-size: 2.1rem; font-weight: 700; letter-spacing: -.02em; margin: .15rem 0 .1rem; font-variant-numeric: tabular-nums; }
+  .range { color: var(--muted); font-size: .85rem; }
+  .breakdown { color: var(--muted); font-size: .82rem; margin-top: .5rem; }
+
+  .bars { margin-top: 1rem; display: grid; gap: .55rem; }
+  .bar-row { display: grid; grid-template-columns: 92px 1fr auto; align-items: center; gap: .6rem; font-size: .78rem; }
+  .bar-row .name { color: var(--muted); }
+  .bar-track { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 999px; background: var(--accent); transition: width .4s cubic-bezier(.2,.7,.2,1); }
+  .bar-row.ref .bar-fill { background: var(--muted); }
+  .bar-row .val { font-variant-numeric: tabular-nums; color: var(--fg); }
+
+  .about, footer { margin-top: 1.1rem; font-size: .76rem; color: var(--muted); line-height: 1.5; }
+  footer { margin-top: 1.25rem; }
+  footer a, .about a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  .err { color: var(--danger); }
+  code { background: var(--surface-2); padding: .05rem .3rem; border-radius: 4px; font-size: .9em; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="topbar">
+  <header>
+    <div class="brand">
+      <div class="mark" aria-hidden="true">🏙</div>
+      <div>
+        <h1 data-i18n="title"></h1>
+        <p class="subtitle" data-i18n="subtitle"></p>
+      </div>
+    </div>
     <button type="button" class="lang" id="lang"></button>
-  </div>
-
-  <h1 data-i18n="title"></h1>
-  <p class="lede" data-i18n-html="lede"></p>
+  </header>
 
   <div class="card">
     <form id="form">
-      <label for="Distrito" data-i18n="lblDistrict"></label>
-      <select id="Distrito"></select>
+      <div class="field">
+        <label for="Distrito" data-i18n="lblDistrict"></label>
+        <select id="Distrito"></select>
+      </div>
 
-      <label for="Habitaciones" data-i18n="lblRooms"></label>
-      <input type="number" id="Habitaciones" min="1" step="1" value="3" required>
+      <div class="grid-2">
+        <div class="field">
+          <label for="Habitaciones" data-i18n="lblRooms"></label>
+          <input type="number" id="Habitaciones" min="1" step="1" value="3" required>
+        </div>
+        <div class="field">
+          <label for="Aseos" data-i18n="lblBaths"></label>
+          <input type="number" id="Aseos" min="1" step="1" value="2" required>
+        </div>
+      </div>
 
-      <label for="Aseos" data-i18n="lblBaths"></label>
-      <input type="number" id="Aseos" min="1" step="1" value="2" required>
-
-      <label for="Superficie" data-i18n-html="lblSize"></label>
-      <input type="number" id="Superficie" min="15" step="1" value="90" required>
-
-      <div class="check">
-        <input type="checkbox" id="Parking">
-        <label for="Parking" data-i18n="lblParking"></label>
+      <div class="grid-2">
+        <div class="field">
+          <label for="Superficie" data-i18n-html="lblSize"></label>
+          <input type="number" id="Superficie" min="15" step="1" value="90" required>
+        </div>
+        <label class="check" style="align-self:end">
+          <input type="checkbox" id="Parking">
+          <span data-i18n="lblParking"></span>
+        </label>
       </div>
 
       <button type="submit" id="submit" disabled></button>
     </form>
 
     <div class="result" id="result" hidden>
+      <div class="eyebrow" data-i18n="resultLabel"></div>
       <div class="price" id="price">—</div>
-      <small id="note"></small>
-      <small id="nn"></small>
+      <div class="range" id="range"></div>
+      <div class="breakdown" id="breakdown"></div>
+
+      <div class="bars">
+        <div class="bar-row">
+          <span class="name" data-i18n="barEstimate"></span>
+          <span class="bar-track"><span class="bar-fill" id="barA"></span></span>
+          <span class="val" id="valA"></span>
+        </div>
+        <div class="bar-row ref">
+          <span class="name" data-i18n="barNN"></span>
+          <span class="bar-track"><span class="bar-fill" id="barB"></span></span>
+          <span class="val" id="valB"></span>
+        </div>
+      </div>
+      <div class="breakdown" id="nnTag"></div>
     </div>
 
     <p class="about" id="about"></p>
@@ -146,94 +205,81 @@
 </div>
 
 <script>
+const RANGE_PCT = 0.15;
 const T = {
   en: {
     title: "Madrid flat price estimator",
-    lede: "Estimate from the <strong>district's €/m²</strong> (~2024 prices) plus "
-      + "the <strong>thesis neural network</strong> (~2020 data) as a reference. "
-      + "Everything runs in your browser.",
+    subtitle: "Runs entirely in your browser",
     lblDistrict: "District",
     lblRooms: "Rooms",
     lblBaths: "Bathrooms",
     lblSize: 'Floor area <span class="hint">(m²)</span>',
-    lblParking: "Has a parking space",
+    lblParking: "Parking",
     btnCalc: "Estimate price",
     btnLoading: "Loading…",
     langOther: "ES",
+    resultLabel: "Estimated price",
+    range: (lo, hi) => `likely range ${lo} – ${hi}`,
+    breakdown: (m2, e, pk) => `${m2} m² × ${e} €/m²` + (pk ? " · +6% parking" : ""),
+    barEstimate: "€/m² · 2024",
+    barNN: "Neural net",
+    nnTag: (sc, cfg) => `Reference: thesis network (${cfg}), ~2020 data · ${sc} schools by district`,
     errTitle: "Could not load the data",
     errBody: 'Open this page from the published site (or serve it with '
       + '<code>python -m http.server</code>): <code>file://</code> cannot load the JSON.',
-    about: (cfg, mae) => `Thesis reference: ${cfg} · mean error ≈ ${mae} · ~2020 data`,
-    note: (d, m2, pk) => `${d} · ${m2} €/m²` + (pk ? " · +6% parking" : ""),
-    nn: (p, sc) => `Thesis neural network (~2020 data): ${p} · ${sc} schools (by district)`,
+    about: (mae) => `Rough orientation only, not an appraisal. Thesis model mean error ≈ ${mae}.`,
     locale: "en-GB",
   },
   es: {
     title: "Tasador de pisos de Madrid",
-    lede: "Estimación por <strong>€/m² del distrito</strong> (precios ~2024) más "
-      + "la <strong>red neuronal del TFM</strong> (datos ~2020) como referencia. "
-      + "Todo corre en tu navegador.",
+    subtitle: "Todo corre en tu navegador",
     lblDistrict: "Distrito",
     lblRooms: "Habitaciones",
     lblBaths: "Aseos",
     lblSize: 'Superficie <span class="hint">(m²)</span>',
-    lblParking: "Tiene plaza de parking",
+    lblParking: "Parking",
     btnCalc: "Calcular precio",
     btnLoading: "Cargando…",
     langOther: "EN",
+    resultLabel: "Precio estimado",
+    range: (lo, hi) => `rango probable ${lo} – ${hi}`,
+    breakdown: (m2, e, pk) => `${m2} m² × ${e} €/m²` + (pk ? " · +6% parking" : ""),
+    barEstimate: "€/m² · 2024",
+    barNN: "Red neuronal",
+    nnTag: (sc, cfg) => `Referencia: red del TFM (${cfg}), datos ~2020 · ${sc} colegios por distrito`,
     errTitle: "No se pudieron cargar los datos",
     errBody: 'Abre esta página desde el sitio publicado (o sírvela con '
       + '<code>python -m http.server</code>): <code>file://</code> no permite cargar los JSON.',
-    about: (cfg, mae) => `Referencia TFM: ${cfg} · error medio ≈ ${mae} · datos ~2020`,
-    note: (d, m2, pk) => `${d} · ${m2} €/m²` + (pk ? " · +6% parking" : ""),
-    nn: (p, sc) => `Red neuronal TFM (datos ~2020): ${p} · ${sc} colegios (por distrito)`,
+    about: (mae) => `Solo orientación aproximada, no es una tasación. Error medio del modelo TFM ≈ ${mae}.`,
     locale: "es-ES",
   },
 };
-
 const FOOTER = {
-  en: 'Rough estimates: the per-district €/m² are ~2024-2025 figures from public '
-    + 'indices and the network was trained on Fotocasa data (~2020). Not a '
-    + 'professional appraisal. '
-    + '<a href="https://github.com/mmartinsie/webscraping-fotocasa">Code on GitHub</a>.',
-  es: 'Estimaciones aproximadas: los €/m² por distrito son cifras ~2024-2025 de '
-    + 'índices públicos y la red se entrenó con datos de Fotocasa (~2020). No es '
-    + 'una tasación profesional. '
+  en: 'Per-district €/m² are ~2024-2025 public-index figures; the network was trained on '
+    + 'Fotocasa data (~2020). '
+    + '<a href="https://github.com/mmartinsie/webscraping-fotocasa">Source on GitHub</a>.',
+  es: 'Los €/m² por distrito son cifras de índices públicos ~2024-2025; la red se entrenó con '
+    + 'datos de Fotocasa (~2020). '
     + '<a href="https://github.com/mmartinsie/webscraping-fotocasa">Código en GitHub</a>.',
 };
 
 const relu = (x) => (x > 0 ? x : 0);
 const PARKING_PREMIUM = 1.06;
-let M = null;   // neural model
-let D = null;   // {district: eur/m2}
-let lastResult = null;
-let loadError = false;
+let M = null, D = null, lastResult = null, loadError = false;
 
-let lang = localStorage.getItem("lang")
-  || (navigator.language || "en").slice(0, 2).toLowerCase();
+let lang = localStorage.getItem("lang") || (navigator.language || "en").slice(0, 2).toLowerCase();
 if (!T[lang]) lang = "en";
 
-function fmt(n) {
-  return Math.round(n).toLocaleString(T[lang].locale);
-}
-function eur(n) {
-  return fmt(n) + " €";
-}
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => Math.round(n).toLocaleString(T[lang].locale);
+const eur = (n) => fmt(n) + " €";
 
 function avg(key) {
   const v = Object.values(D).map((d) => d[key]);
   return v.reduce((a, b) => a + b, 0) / v.length;
 }
-function districtEurM2(district) {
-  return (D && D[district] && D[district].eur_m2) || avg("eur_m2");
-}
-function districtSchools(district) {
-  return Math.round((D && D[district] && D[district].colegios) ?? avg("colegios"));
-}
-function districtEstimate(district, superficie, parking) {
-  const eurM2 = districtEurM2(district);
-  return { price: eurM2 * superficie * (parking ? PARKING_PREMIUM : 1), eurM2 };
-}
+const districtEurM2 = (d) => (D && D[d] && D[d].eur_m2) || avg("eur_m2");
+const districtSchools = (d) => Math.round((D && D[d] && D[d].colegios) ?? avg("colegios"));
 
 function predict(values) {
   let v = values.map((x, i) => (x - M.scaler.mean[i]) / M.scaler.scale[i]);
@@ -253,7 +299,7 @@ function predict(values) {
 }
 
 function renderDistricts() {
-  const select = document.getElementById("Distrito");
+  const select = $("Distrito");
   if (!D) return;
   const current = select.value;
   select.innerHTML = "";
@@ -266,69 +312,73 @@ function renderDistricts() {
   if (current) select.value = current;
 }
 
+function compute() {
+  if (!M || !D) return;
+  const district = $("Distrito").value;
+  const superficie = parseFloat($("Superficie").value || "0");
+  const parking = $("Parking").checked ? 1 : 0;
+  const eurM2 = districtEurM2(district);
+  const distPrice = eurM2 * superficie * (parking ? PARKING_PREMIUM : 1);
+  const schools = districtSchools(district);
+
+  const numeric = M.numeric_features || M.features || [];
+  const values = numeric.map((name) => {
+    if (name === "Colegios") return schools;
+    const el = $(name);
+    if (!el) return 0;
+    return el.type === "checkbox" ? (el.checked ? 1 : 0) : parseFloat(el.value || "0");
+  });
+  for (const cat of M.district_categories || []) values.push(cat === district ? 1 : 0);
+
+  lastResult = { eurM2, superficie, parking, schools, distPrice, nnPrice: predict(values) };
+  $("result").hidden = false;
+  paint();
+}
+
+function paint() {
+  if (!lastResult) return;
+  const t = T[lang];
+  const { eurM2, superficie, parking, schools, distPrice, nnPrice } = lastResult;
+  $("price").textContent = eur(distPrice);
+  $("range").textContent = t.range(eur(distPrice * (1 - RANGE_PCT)), eur(distPrice * (1 + RANGE_PCT)));
+  $("breakdown").textContent = t.breakdown(fmt(superficie), fmt(eurM2), parking);
+  const max = Math.max(distPrice, nnPrice, 1);
+  $("barA").style.width = (100 * distPrice / max) + "%";
+  $("barB").style.width = (100 * nnPrice / max) + "%";
+  $("valA").textContent = eur(distPrice);
+  $("valB").textContent = eur(nnPrice);
+  $("nnTag").textContent = t.nnTag(schools, (M.meta && M.meta.config) || "MLP");
+}
+
 function render() {
   const t = T[lang];
   document.documentElement.lang = lang;
   document.title = t.title;
-  document.getElementById("lang").textContent = t.langOther;
-  document.querySelectorAll("[data-i18n]").forEach((el) => {
-    el.textContent = t[el.dataset.i18n];
-  });
+  $("lang").textContent = t.langOther;
+  document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t[el.dataset.i18n]; });
   document.querySelectorAll("[data-i18n-html]").forEach((el) => {
     el.innerHTML = el.dataset.i18nHtml === "footer" ? FOOTER[lang] : t[el.dataset.i18nHtml];
   });
-
-  const submit = document.getElementById("submit");
-  const about = document.getElementById("about");
+  const submit = $("submit");
+  const about = $("about");
   if (loadError) {
     submit.textContent = t.errTitle;
     about.innerHTML = `<span class="err">${t.errBody}</span>`;
     return;
   }
   submit.textContent = M ? t.btnCalc : t.btnLoading;
-  if (M) {
-    const mae = M.meta.mae != null ? eur(M.meta.mae) : "n/a";
-    about.textContent = t.about(M.meta.config || "neural network", mae);
-  }
+  if (M) about.textContent = t.about(M.meta && M.meta.mae != null ? eur(M.meta.mae) : "n/a");
   renderDistricts();
-  if (lastResult) {
-    const { district, eurM2, parking, distPrice, nnPrice, schools } = lastResult;
-    document.getElementById("price").textContent = eur(distPrice);
-    document.getElementById("note").textContent = t.note(district, fmt(eurM2), parking);
-    document.getElementById("nn").textContent = t.nn(eur(nnPrice), schools);
-  }
+  paint();
 }
 
-document.getElementById("lang").addEventListener("click", () => {
+$("lang").addEventListener("click", () => {
   lang = lang === "en" ? "es" : "en";
-  localStorage.setItem("lang", lang);
+  try { localStorage.setItem("lang", lang); } catch (e) {}
   render();
 });
-
-document.getElementById("form").addEventListener("submit", (ev) => {
-  ev.preventDefault();
-  if (!M || !D) return;
-  const district = document.getElementById("Distrito").value;
-  const superficie = parseFloat(document.getElementById("Superficie").value || "0");
-  const parking = document.getElementById("Parking").checked ? 1 : 0;
-
-  const { price: distPrice, eurM2 } = districtEstimate(district, superficie, parking);
-  const schools = districtSchools(district);
-
-  const numeric = M.numeric_features || M.features || [];
-  const nnValues = numeric.map((name) => {
-    if (name === "Colegios") return schools;
-    const el = document.getElementById(name);
-    if (!el) return 0;
-    return el.type === "checkbox" ? (el.checked ? 1 : 0) : parseFloat(el.value || "0");
-  });
-  for (const cat of M.district_categories || []) nnValues.push(cat === district ? 1 : 0);
-  const nnPrice = predict(nnValues);
-
-  lastResult = { district, eurM2, parking, distPrice, nnPrice, schools };
-  document.getElementById("result").hidden = false;
-  render();
-});
+$("form").addEventListener("submit", (ev) => { ev.preventDefault(); compute(); });
+$("form").addEventListener("input", () => { if (lastResult) compute(); });
 
 async function init() {
   try {
@@ -341,11 +391,10 @@ async function init() {
     render();
     return;
   }
-  document.getElementById("submit").disabled = false;
-
+  $("submit").disabled = false;
   const medians = M.feature_medians || {};
   for (const name of M.numeric_features || M.features || []) {
-    const el = document.getElementById(name);
+    const el = $(name);
     if (el && medians[name] != null) {
       if (el.type === "checkbox") el.checked = Math.round(medians[name]) === 1;
       else el.value = Math.round(medians[name]);
