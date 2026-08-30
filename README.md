@@ -7,10 +7,10 @@ and, on the other side, the neural network that predicts the price of a property
 based on its characteristics.
 
 **[Live demo](https://mmartinsie.github.io/webscraping-fotocasa/)** — a static
-page (in `docs/`) that estimates a price from the district's €/m²
+page (in `docs/`, EN/ES) that estimates a price from the district's €/m²
 ([`data/precio_m2_distrito.csv`](data/README.md), ~2024) and shows the thesis
 neural network's number (~2020 data) as a reference, all in the browser.
-A conversational version (Gemini + Streamlit) lives in
+A conversational version (Gemini + Streamlit, EN/ES) lives in
 [`webapp/`](webapp/README.md) for deploy on Streamlit Community Cloud.
 
 ## Pipeline

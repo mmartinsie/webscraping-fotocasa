@@ -1,10 +1,14 @@
 """Conversational price estimator - Streamlit + Google Gemini (free tier).
 
-Gemini chats with the user, collects the flat's features and calls the
-``estimar_precio`` tool, which runs the model from ``docs/model.json`` locally
-(NumPy, no TensorFlow). Deploy on Streamlit Community Cloud with the main file
-set to ``webapp/streamlit_app.py`` and a ``GEMINI_API_KEY`` secret (get one free
-at https://aistudio.google.com/apikey).
+Gemini chats with the user (in English or Spanish, matching how they write),
+collects the flat's features including the Madrid district, and calls the
+``estimate_price`` tool. That tool returns a "district €/m² x m2" estimate
+(~2024 figures from ``data/precio_m2_distrito.csv``) plus the thesis network's
+number from ``docs/model.json`` (NumPy, no TensorFlow) as a reference.
+
+Deploy on Streamlit Community Cloud with the main file set to
+``webapp/streamlit_app.py`` and a ``GEMINI_API_KEY`` secret (free key at
+https://aistudio.google.com/apikey).
 
 Run locally:  GEMINI_API_KEY=...  streamlit run webapp/streamlit_app.py
 """
@@ -26,51 +30,90 @@ from pricing import estimate_by_district, load_districts, load_model, predict_pr
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
 MAX_RETRIES = 2
 
-st.set_page_config(page_title="Tasador conversacional", page_icon="🏠")
+st.set_page_config(page_title="Madrid flat price chat", page_icon="🏠")
 MODEL = load_model()
 DISTRICTS = load_districts()
 
 SYSTEM = (
-    "Ayudas a estimar el precio de venta de un piso en Madrid. Habla en español, "
-    "respuestas breves. Necesitas: distrito de Madrid, número de habitaciones, "
-    "número de aseos, superficie en m², si tiene parking (sí/no) y cuántos "
-    "colegios hay cerca (si el usuario no lo sabe, usa 9 y díselo). Distritos "
-    f"válidos: {', '.join(DISTRICTS)}. Pregunta lo que falte, acepta los datos en "
-    "cualquier orden, y cuando los tengas todos llama a la función estimar_precio. "
-    "Da el resultado en euros: el principal (por €/m² del distrito, precios ~2024) "
-    "y menciona el de la red neuronal del TFM (datos ~2020) como referencia. "
-    "Aclara que son estimaciones aproximadas, no una tasación."
+    "You help estimate the sale price of a flat in Madrid. Reply in the same "
+    "language the user writes in (English or Spanish); keep answers short. You "
+    "need: the Madrid district, number of rooms, number of bathrooms, floor area "
+    "in m2, whether it has parking (yes/no) and how many schools are nearby (if "
+    f"the user doesn't know, use 9 and say so). Valid districts: {', '.join(DISTRICTS)}. "
+    "Ask for whatever is missing, accept values in any order, and once you have "
+    "them all call the estimate_price function. Report the euro figures: the main "
+    "one (district €/m2, ~2024 prices) and mention the thesis neural-network "
+    "reference (~2020 data). Make clear these are rough estimates, not an appraisal."
 )
 
+STR = {
+    "English": {
+        "title": "🏠 Madrid flat price chat",
+        "caption": "€/m² by district (~2024) + thesis neural network (~2020) · rough estimate",
+        "no_key": "Missing `GEMINI_API_KEY` (app secret or environment variable).",
+        "model_label": "Gemini model",
+        "model_help": "The free tier caps requests per minute; on a 429, wait a few "
+        "seconds or pick a `-lite` model.",
+        "language_label": "Language / Idioma",
+        "load_fail": "Could not load `{model}`: {exc}",
+        "input": "Tell me about the flat…",
+        "thinking": "Thinking…",
+        "retry": "Free-tier limit hit, retrying in {wait:.0f} s…",
+        "quota": "Gemini's free quota for this minute is used up. Wait a bit and try "
+        "again, or pick a `-lite` model in the sidebar.",
+        "models_available": "\n\nAvailable models: ",
+        "gemini_error": "Error talking to Gemini: {exc}",
+        "failed": "Could not complete the request.",
+    },
+    "Español": {
+        "title": "🏠 Tasador conversacional de pisos",
+        "caption": "€/m² por distrito (~2024) + red neuronal del TFM (~2020) · estimación aproximada",
+        "no_key": "Falta `GEMINI_API_KEY` (secret de la app o variable de entorno).",
+        "model_label": "Modelo Gemini",
+        "model_help": "El tier gratuito limita las peticiones por minuto; si ves un "
+        "error 429, espera unos segundos o elige un modelo `-lite`.",
+        "language_label": "Idioma / Language",
+        "load_fail": "No se pudo cargar `{model}`: {exc}",
+        "input": "Cuéntame sobre el piso…",
+        "thinking": "Pensando…",
+        "retry": "Límite gratuito alcanzado, reintento en {wait:.0f} s…",
+        "quota": "Se ha agotado la cuota gratuita de Gemini para este minuto. Espera "
+        "un poco y vuelve a intentarlo, o elige un modelo `-lite` en la barra lateral.",
+        "models_available": "\n\nModelos disponibles: ",
+        "gemini_error": "Error al hablar con Gemini: {exc}",
+        "failed": "No se pudo completar la petición.",
+    },
+}
 
-def estimar_precio(
-    distrito: str, habitaciones: int, aseos: int, superficie: float, parking: int, colegios: int
+
+def estimate_price(
+    district: str, rooms: int, bathrooms: int, area_m2: float, parking: int, schools: int
 ) -> dict:
-    """Estima el precio de venta de un piso en Madrid.
+    """Estimate the sale price of a flat in Madrid.
 
     Args:
-        distrito: distrito de Madrid (p. ej. Salamanca, Chamberí, Carabanchel).
-        habitaciones: número de habitaciones.
-        aseos: número de baños.
-        superficie: superficie en metros cuadrados.
-        parking: 1 si tiene plaza de garaje, 0 si no.
-        colegios: número de colegios cercanos (usa 9 si se desconoce).
+        district: Madrid district (e.g. Salamanca, Chamberí, Carabanchel).
+        rooms: number of rooms.
+        bathrooms: number of bathrooms.
+        area_m2: floor area in square metres.
+        parking: 1 if it has a parking space, 0 otherwise.
+        schools: number of nearby schools (use 9 if unknown).
     """
-    by_district = estimate_by_district(DISTRICTS, distrito, superficie, parking)
+    by_district = estimate_by_district(DISTRICTS, district, area_m2, parking)
     nn_price = predict_price(
         MODEL,
         {
-            "Habitaciones": habitaciones,
-            "Aseos": aseos,
-            "Superficie": superficie,
+            "Habitaciones": rooms,
+            "Aseos": bathrooms,
+            "Superficie": area_m2,
             "Parking": parking,
-            "Colegios": colegios,
+            "Colegios": schools,
         },
     )
     return {
-        "precio_estimado_eur": by_district["price_eur"],
-        "metodo": f"{by_district['distrito']} a {by_district['eur_m2']:,} €/m² (~2024)",
-        "referencia_red_neuronal_2020_eur": round(nn_price),
+        "price_eur": by_district["price_eur"],
+        "method": f"{by_district['distrito']} at {by_district['eur_m2']:,} €/m² (~2024)",
+        "reference_neural_network_2020_eur": round(nn_price),
     }
 
 
@@ -98,7 +141,7 @@ def available_models() -> list[str]:
 
 
 def build_chat(model_name: str):
-    model = genai.GenerativeModel(model_name, system_instruction=SYSTEM, tools=[estimar_precio])
+    model = genai.GenerativeModel(model_name, system_instruction=SYSTEM, tools=[estimate_price])
     return model.start_chat(enable_automatic_function_calling=True)
 
 
@@ -107,7 +150,7 @@ def _retry_after(exc: Exception) -> float:
     return min(float(match.group(1)) + 1, 30) if match else 10.0
 
 
-def send_message(chat, prompt: str) -> str:
+def send_message(chat, prompt: str, t: dict) -> str:
     """Send a turn, backing off once or twice on a 429 (free-tier rate limit)."""
     for attempt in range(MAX_RETRIES + 1):
         try:
@@ -116,32 +159,29 @@ def send_message(chat, prompt: str) -> str:
             text = str(exc)
             if "429" in text and attempt < MAX_RETRIES:
                 wait = _retry_after(exc)
-                with st.spinner(f"Límite gratuito alcanzado, reintento en {wait:.0f} s…"):
+                with st.spinner(t["retry"].format(wait=wait)):
                     time.sleep(wait)
                 continue
             if "404" in text or "not found" in text.lower():
                 models = available_models()
-                hint = ("\n\nModelos disponibles: " + ", ".join(models)) if models else ""
+                hint = (t["models_available"] + ", ".join(models)) if models else ""
                 return f"Error: {exc}{hint}"
             if "429" in text:
-                return (
-                    "Se ha agotado la cuota gratuita de Gemini para este minuto. "
-                    "Espera un poco y vuelve a intentarlo, o elige un modelo `-lite` "
-                    "en la barra lateral."
-                )
-            return f"Error al hablar con Gemini: {exc}"
-    return "No se pudo completar la petición."
+                return t["quota"]
+            return t["gemini_error"].format(exc=exc)
+    return t["failed"]
 
 
-st.title("🏠 Tasador conversacional de pisos")
-st.caption(
-    f"Modelo entrenado con datos de Fotocasa · conversación con Gemini · "
-    f"error medio ≈ {MODEL['meta'].get('mae', 0):,.0f} € · estimación aproximada"
-)
+with st.sidebar:
+    language = st.radio("Language / Idioma", list(STR), horizontal=True)
+t = STR[language]
+
+st.title(t["title"])
+st.caption(t["caption"])
 
 api_key = _from_secret_or_env("GEMINI_API_KEY")
 if not api_key:
-    st.error("Falta `GEMINI_API_KEY` (secret de la app o variable de entorno).")
+    st.error(t["no_key"])
     st.stop()
 genai.configure(api_key=api_key)
 
@@ -150,11 +190,8 @@ options = available_models() or [preferred]
 if preferred not in options:
     options = [preferred, *options]
 with st.sidebar:
-    model_name = st.selectbox("Modelo Gemini", options, index=options.index(preferred))
-    st.caption(
-        "El tier gratuito limita las peticiones por minuto; si ves un error 429, "
-        "espera unos segundos o elige un modelo `-lite`."
-    )
+    model_name = st.selectbox(t["model_label"], options, index=options.index(preferred))
+    st.caption(t["model_help"])
 
 # (Re)build the chat when the app starts or the model changes.
 if st.session_state.get("model_name") != model_name:
@@ -162,7 +199,7 @@ if st.session_state.get("model_name") != model_name:
         st.session_state.chat = build_chat(model_name)
         st.session_state.model_name = model_name
     except Exception as exc:
-        st.error(f"No se pudo cargar `{model_name}`: {exc}")
+        st.error(t["load_fail"].format(model=model_name, exc=exc))
         st.stop()
 chat = st.session_state.chat
 
@@ -173,10 +210,10 @@ for message in chat.history:
         with st.chat_message(role):
             st.write(text)
 
-if prompt := st.chat_input("Cuéntame sobre el piso…"):
+if prompt := st.chat_input(t["input"]):
     with st.chat_message("user"):
         st.write(prompt)
     with st.chat_message("assistant"):
-        with st.spinner("Pensando…"):
-            answer = send_message(chat, prompt)
+        with st.spinner(t["thinking"]):
+            answer = send_message(chat, prompt, t)
         st.write(answer)
