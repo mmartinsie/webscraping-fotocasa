@@ -28,14 +28,7 @@ import time
 import google.generativeai as genai
 import streamlit as st
 
-from pricing import (
-    district_schools,
-    estimate_by_district,
-    load_district_schools,
-    load_districts,
-    load_model,
-    predict_price,
-)
+from tools import TOOLS, VALID_DISTRICTS, estimate_price
 
 # gemini-*-lite models get the most generous free-tier request quota, which
 # matters here: automatic function calling makes 2-3 API calls per user turn.
@@ -45,20 +38,18 @@ MAX_RETRIES = 2
 RANGE_PCT = 0.15  # +/- band shown around the point estimate
 
 st.set_page_config(page_title="Madrid flat price chat", page_icon="🏠")
-MODEL = load_model()
-DISTRICTS = load_districts()
-DISTRICT_SCHOOLS = load_district_schools()
 
 SYSTEM = (
-    "You help estimate the sale price of a flat in Madrid. Reply in the same "
-    "language the user writes in (English or Spanish); keep answers short. You "
-    "need: the Madrid district, number of rooms, number of bathrooms, floor area "
-    "in m2, and whether it has parking (yes/no). The number of nearby schools is "
-    f"derived from the district automatically. Valid districts: {', '.join(DISTRICTS)}. "
-    "Ask for whatever is missing, accept values in any order, and once you have "
-    "them all call the estimate_price function. Report the euro figures: the main "
-    "one (district €/m2, ~2024 prices) and mention the thesis neural-network "
-    "reference (~2020 data). Make clear these are rough estimates, not an appraisal."
+    "You help estimate the sale price of flats in Madrid. Reply in the same "
+    "language the user writes in (English or Spanish); keep answers short. "
+    "Two tools are available: `estimate_price` (one flat: needs district, rooms, "
+    "bathrooms, floor area in m2, parking yes/no - nearby schools are derived "
+    "from the district) and `compare_districts` (the same flat priced across "
+    "every district: needs only area and parking). Pick the right one, ask for "
+    "whatever is missing, accept values in any order. After `estimate_price` "
+    "report the euro figure and mention the thesis neural-network reference "
+    f"(~2020). Valid districts: {', '.join(VALID_DISTRICTS)}. Make clear these "
+    "are rough estimates, not an appraisal."
 )
 
 STR = {
@@ -82,10 +73,14 @@ STR = {
         "tab_chat": "Chat",
         "tab_form": "Form",
         "how": "How this agent works",
-        "how_body": "A system prompt + the `estimate_price` tool schema are sent to "
-        "Gemini. It asks for whatever is missing, then emits a function call; the "
-        "SDK runs `estimate_price` locally and feeds the result back, and Gemini "
-        "phrases the answer. Every call/result is shown below.",
+        "how_body": "A system prompt + two tool schemas (`estimate_price`, "
+        "`compare_districts`) are sent to Gemini. It picks a tool, asks for "
+        "whatever is missing, then emits a function call; the SDK runs it locally "
+        "and feeds the result back, and Gemini phrases the answer. Every "
+        "call/result is shown below.",
+        "sb_turns": "Turns",
+        "sb_tokens": "Tokens",
+        "sb_latency": "Last turn",
         "examples": [
             "3 rooms, 2 baths, 90 m², Salamanca, no parking",
             "2-bed 70 m² flat in Carabanchel with parking",
@@ -122,11 +117,14 @@ STR = {
         "tab_chat": "Chat",
         "tab_form": "Formulario",
         "how": "Cómo funciona este agente",
-        "how_body": "Se envía a Gemini un system prompt + el esquema de la "
-        "herramienta `estimate_price`. Pregunta lo que falte, luego emite una "
-        "llamada a función; el SDK ejecuta `estimate_price` en local y le devuelve "
-        "el resultado, y Gemini redacta la respuesta. Cada llamada/resultado se "
-        "muestra abajo.",
+        "how_body": "Se envía a Gemini un system prompt + dos esquemas de "
+        "herramienta (`estimate_price`, `compare_districts`). Elige una, pregunta "
+        "lo que falte, luego emite una llamada a función; el SDK la ejecuta en "
+        "local y le devuelve el resultado, y Gemini redacta la respuesta. Cada "
+        "llamada/resultado se muestra abajo.",
+        "sb_turns": "Turnos",
+        "sb_tokens": "Tokens",
+        "sb_latency": "Último turno",
         "examples": [
             "3 habitaciones, 2 baños, 90 m², Salamanca, sin parking",
             "piso de 2 hab, 70 m², en Carabanchel con garaje",
@@ -144,36 +142,6 @@ STR = {
         "tool_result": "↩ resultado",
     },
 }
-
-
-def estimate_price(district: str, rooms: int, bathrooms: int, area_m2: float, parking: int) -> dict:
-    """Estimate the sale price of a flat in Madrid.
-
-    Args:
-        district: Madrid district (e.g. Salamanca, Chamberí, Carabanchel).
-        rooms: number of rooms.
-        bathrooms: number of bathrooms.
-        area_m2: floor area in square metres.
-        parking: 1 if it has a parking space, 0 otherwise.
-    """
-    by_district = estimate_by_district(DISTRICTS, district, area_m2, parking)
-    schools = district_schools(DISTRICT_SCHOOLS, district)
-    nn_price = predict_price(
-        MODEL,
-        {
-            "Habitaciones": rooms,
-            "Aseos": bathrooms,
-            "Superficie": area_m2,
-            "Parking": parking,
-            "Colegios": schools,
-        },
-    )
-    return {
-        "price_eur": by_district["price_eur"],
-        "method": f"{by_district['distrito']} at {by_district['eur_m2']:,} €/m² (~2024)",
-        "schools_by_district": schools,
-        "reference_neural_network_2020_eur": round(nn_price),
-    }
 
 
 def _from_secret_or_env(name: str) -> str | None:
@@ -200,7 +168,7 @@ def available_models() -> list[str]:
 
 
 def build_chat(model_name: str):
-    model = genai.GenerativeModel(model_name, system_instruction=SYSTEM, tools=[estimate_price])
+    model = genai.GenerativeModel(model_name, system_instruction=SYSTEM, tools=TOOLS)
     return model.start_chat(enable_automatic_function_calling=True)
 
 
@@ -241,11 +209,13 @@ def render_history(chat, t: dict) -> None:
                     st.code(json.dumps(_to_dict(resp.response), ensure_ascii=False, indent=2), "json")
 
 
-def send_message(chat, prompt: str, t: dict) -> str:
-    """Send a turn, backing off once or twice on a 429 (free-tier rate limit)."""
+def send_message(chat, prompt: str, t: dict) -> tuple[str, int]:
+    """Send a turn (retrying on a 429). Returns ``(text, tokens_used)``."""
     for attempt in range(MAX_RETRIES + 1):
         try:
-            return chat.send_message(prompt).text
+            response = chat.send_message(prompt)
+            usage = getattr(response, "usage_metadata", None)
+            return response.text, getattr(usage, "total_token_count", 0)
         except Exception as exc:
             text = str(exc)
             if "429" in text and attempt < MAX_RETRIES:
@@ -256,11 +226,11 @@ def send_message(chat, prompt: str, t: dict) -> str:
             if "404" in text or "not found" in text.lower():
                 models = available_models()
                 hint = (t["models_available"] + ", ".join(models)) if models else ""
-                return f"Error: {exc}{hint}"
+                return f"Error: {exc}{hint}", 0
             if "429" in text:
-                return t["quota"]
-            return t["gemini_error"].format(exc=exc)
-    return t["failed"]
+                return t["quota"], 0
+            return t["gemini_error"].format(exc=exc), 0
+    return t["failed"], 0
 
 
 with st.sidebar:
@@ -294,15 +264,24 @@ if st.session_state.get("model_name") != model_name:
         st.stop()
 chat = st.session_state.chat
 
-with st.sidebar, st.expander(t["how"]):
-    st.markdown(t["how_body"])
+st.session_state.setdefault("turns", 0)
+st.session_state.setdefault("tokens", 0)
+st.session_state.setdefault("latency", 0.0)
+
+with st.sidebar:
+    with st.expander(t["how"]):
+        st.markdown(t["how_body"])
+    m1, m2, m3 = st.columns(3)
+    m1.metric(t["sb_turns"], st.session_state.turns)
+    m2.metric(t["sb_tokens"], f"{st.session_state.tokens:,}")
+    m3.metric(t["sb_latency"], f"{st.session_state.latency:.1f}s")
 
 tab_chat, tab_form = st.tabs([t["tab_chat"], t["tab_form"]])
 
 # --- Form tab: calls the tool directly, always works ---------------------- #
 with tab_form:
     with st.form("estimate"):
-        district = st.selectbox(t["f_district"], sorted(DISTRICTS))
+        district = st.selectbox(t["f_district"], VALID_DISTRICTS)
         c1, c2, c3 = st.columns(3)
         rooms = c1.number_input(t["f_rooms"], 1, 20, 3)
         baths = c2.number_input(t["f_baths"], 1, 10, 2)
@@ -328,7 +307,12 @@ with tab_chat:
     if prompt:
         with st.chat_message("user"):
             st.write(prompt)
+        with st.spinner(t["thinking"]):
+            started = time.perf_counter()
+            answer, tokens = send_message(chat, prompt, t)
+        st.session_state.latency = time.perf_counter() - started
+        st.session_state.turns += 1
+        st.session_state.tokens += tokens
         with st.chat_message("assistant"):
-            with st.spinner(t["thinking"]):
-                answer = send_message(chat, prompt, t)
             st.write(answer)
+        st.rerun()  # refresh the history view and the sidebar counters

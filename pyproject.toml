@@ -17,6 +17,7 @@ known-first-party = [
     "predict",
     "prepare_dataset",
     "pricing",
+    "tools",
 ]
 
 [tool.ruff.lint.per-file-ignores]

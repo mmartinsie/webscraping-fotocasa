@@ -16,7 +16,7 @@ Madrid"* and since refactored into a small, tested codebase.
 | | What it shows |
 | --- | --- |
 | **[🌐 Static estimator](https://mmartinsie.github.io/webscraping-fotocasa/)** | A single HTML page (EN/ES) that runs the trained network in the browser — no backend, no build. Estimates from the district's €/m² and shows the neural network as a reference. |
-| **[🤖 LLM agent](webapp/README.md)** *(deploy from `webapp/`)* | Gemini + function calling. The model asks for the missing inputs, calls one tool, and every call/result is shown inline. A "Form" tab hits the same tool directly when the free quota runs out. |
+| **[🤖 LLM agent](webapp/README.md)** *(deploy from `webapp/`)* | Gemini + function calling with two tools (`estimate_price`, `compare_districts`). The model picks one, asks for the missing inputs, and every call/result is shown inline; the sidebar tracks turns / tokens / latency. A "Form" tab and a hand-written-loop CLI (`agent_manual.py`) round it out. |
 
 ## What this project demonstrates
 
@@ -29,7 +29,8 @@ Madrid"* and since refactored into a small, tested codebase.
   The write-up says plainly that a random forest beats the network here.
 - **Two deployments from one core** — the same NumPy forward pass powers the
   static page, the CLI, and the agent tool.
-- **LLM agent** — tool-use / function-calling loop, made visible in the UI.
+- **LLM agent** — multi-tool function-calling loop (SDK-driven and a hand-written
+  variant), made visible in the UI, with token/latency instrumentation.
 - **Engineering hygiene** — 50+ tests, `ruff`, CI on Python 3.9/3.11/3.12,
   type hints, `make check`.
 
@@ -71,7 +72,7 @@ as a secondary reference.
 | [`webscraping/`](webscraping/README.md) | Fotocasa scraper: `main.py` (CLI), `listing.py` (parser), `home.py` (dataclass). |
 | [`prepare_dataset.py`](prepare_dataset.py) | Raw scraper CSV → model-ready dataset. |
 | [`keras_neural_network/`](keras_neural_network/README.md) | `recommend_price.py` (CV + save), `predict.py`, `baseline.py`, `chat.py` (Claude CLI agent), `export_web.py`, shared `dataset.py` / `metrics.py`, [`DATA.md`](keras_neural_network/DATA.md), [`MODEL_CARD.md`](keras_neural_network/MODEL_CARD.md). |
-| [`webapp/`](webapp/README.md) | Streamlit + Gemini LLM agent, `pricing.py` (NumPy forward pass of the model, no TensorFlow). |
+| [`webapp/`](webapp/README.md) | Streamlit + Gemini LLM agent — `tools.py` (the two tool functions), `pricing.py` (€/m² table + NumPy forward pass, no TensorFlow), `agent_manual.py` (explicit loop). |
 | [`docs/`](docs/README.md) | The static estimator (`index.html` + generated `model.json` / `districts.json`). |
 | [`data/`](data/README.md) | Per-district €/m² and school-count reference tables. |
 | [`neural_network/`](neural_network/README.md) | Obsolete from-scratch NumPy network, kept for reference. |
