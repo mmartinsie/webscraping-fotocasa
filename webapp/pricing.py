@@ -46,15 +46,30 @@ def _load_table(path: str | Path, value_col: str) -> dict[str, float]:
         return {row["Distrito"]: float(row[value_col]) for row in csv.DictReader(handle)}
 
 
+def match_district(table: dict[str, float], distrito: str | None) -> str | None:
+    """Canonical district name for a fuzzy input, or ``None`` if unrecognised.
+
+    Exact match after accent/case folding, or (for multi-word inputs) all of the
+    input's words being a subset of the district's words - so "puente vallecas"
+    resolves but a bare "vallecas" (ambiguous) does not.
+    """
+    if not distrito:
+        return None
+    target = _norm(distrito)
+    tokens = set(target.split())
+    for name in table:
+        words = set(_norm(name).split())
+        if _norm(name) == target or (len(tokens) >= 2 and tokens <= words):
+            return name
+    return None
+
+
 def _lookup(table: dict[str, float], distrito: str | None) -> tuple[float, str]:
-    """Accent/case-insensitive lookup; falls back to the table average."""
-    average = sum(table.values()) / len(table)
-    if distrito:
-        target = _norm(distrito)
-        for name, value in table.items():
-            if _norm(name) == target or target in _norm(name) or _norm(name) in target:
-                return value, name
-    return average, "media de Madrid"
+    """``(value, name)`` for ``distrito``; the table average if unrecognised."""
+    name = match_district(table, distrito)
+    if name is not None:
+        return table[name], name
+    return sum(table.values()) / len(table), "media de Madrid"
 
 
 def load_districts(path: str | Path = DEFAULT_DISTRICT_CSV) -> dict[str, float]:

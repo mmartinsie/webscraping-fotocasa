@@ -290,9 +290,14 @@ with tab_form:
         go = st.form_submit_button(t["f_go"])
     if go:
         r = estimate_price(district, int(rooms), int(baths), float(area), int(parking))
-        st.metric(t["f_result"], f"{r['price_eur']:,.0f} €", price_range(r["price_eur"]), delta_color="off")
-        st.caption(f"{r['method']} · " + t["f_schools"].format(n=r["schools_by_district"]))
-        st.caption(f"{t['f_nn']}: {r['reference_neural_network_2020_eur']:,.0f} €")
+        if "error" in r:
+            st.error(r["error"])
+        else:
+            st.metric(
+                t["f_result"], f"{r['price_eur']:,.0f} €", price_range(r["price_eur"]), delta_color="off"
+            )
+            st.caption(f"{r['method']} · " + t["f_schools"].format(n=r["schools_by_district"]))
+            st.caption(f"{t['f_nn']}: {r['reference_neural_network_2020_eur']:,.0f} €")
 
 # --- Chat tab: the Gemini agent ----------------------------------------- #
 prompt = st.chat_input(t["input"])

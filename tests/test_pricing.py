@@ -10,6 +10,7 @@ from pricing import (
     load_district_schools,
     load_districts,
     load_model,
+    match_district,
     predict_price,
 )
 
@@ -73,6 +74,14 @@ def test_districts_table_has_all_madrid_districts(districts):
 def test_district_lookup_is_accent_and_case_insensitive(districts):
     assert district_eur_m2(districts, "chamberi")[1] == "Chamberí"
     assert district_eur_m2(districts, "SALAMANCA")[1] == "Salamanca"
+
+
+def test_match_district_tokens_and_rejects_ambiguous(districts):
+    assert match_district(districts, "puente vallecas") == "Puente de Vallecas"
+    assert match_district(districts, "ciudad-lineal".replace("-", " ")) == "Ciudad Lineal"
+    assert match_district(districts, "vallecas") is None  # ambiguous, one word
+    assert match_district(districts, "Gotham") is None
+    assert match_district(districts, None) is None
 
 
 def test_unknown_district_falls_back_to_average(districts):
