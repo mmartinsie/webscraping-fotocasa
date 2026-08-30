@@ -30,7 +30,7 @@ python -m http.server -d docs 8000   # then open http://localhost:8000
 
 ## Deployment
 
-`.github/workflows/pages.yml` publishes this folder to GitHub Pages on every push
-that touches `docs/`. Enable it once in **Settings → Pages → Build and deployment
-→ Source → GitHub Actions**. Live at
+GitHub Pages serves this folder directly - no workflow needed. Enable it once in
+**Settings → Pages → Build and deployment → Source: "Deploy from a branch" →
+Branch: `master` `/docs`**. Every push to `docs/` then republishes it. Live at
 `https://mmartinsie.github.io/webscraping-fotocasa/`.
