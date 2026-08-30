@@ -8,6 +8,8 @@ based on its characteristics.
 
 **[Live demo](https://mmartinsie.github.io/webscraping-fotocasa/)** — a static
 page (in `docs/`) that runs the trained model entirely in the browser.
+A conversational version (Gemini + Streamlit) lives in
+[`webapp/`](webapp/README.md) for deploy on Streamlit Community Cloud.
 
 ## Pipeline
 

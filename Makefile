@@ -1,7 +1,7 @@
 # Convenience targets. Use `py` on Windows if `python` opens the Store stub.
 PYTHON ?= python
 
-.PHONY: lint test check demo-model dataset
+.PHONY: lint test check demo-model dataset app
 
 lint:
 	ruff check .
@@ -21,3 +21,7 @@ demo-model:
 # Clean the raw scraper CSV into a model-ready dataset.
 dataset:
 	$(PYTHON) prepare_dataset.py webscraping/buildings_information.csv -o dataset.csv
+
+# Run the conversational web app locally (needs GEMINI_API_KEY).
+app:
+	streamlit run webapp/streamlit_app.py

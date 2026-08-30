@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+from pricing import predict_price
+
 MODEL_JSON = Path(__file__).resolve().parents[1] / "docs" / "model.json"
 
 
@@ -57,3 +59,12 @@ def test_forward_pass_within_band_and_monotonic_in_size():
     bigger = list(typical)
     bigger[size_idx] = bigger[size_idx] * 2 + 1
     assert forward(m, bigger) > price  # more floor area -> higher price
+
+
+def test_js_port_matches_numpy_impl():
+    """The docs/index.html port and webapp/pricing.py must agree."""
+    m = load_model()
+    for factor in (0.5, 1.0, 2.0):
+        feats = {name: m["feature_medians"][name] * factor for name in m["features"]}
+        values = [feats[name] for name in m["features"]]
+        assert forward(m, values) == pytest.approx(predict_price(m, feats), rel=1e-6)

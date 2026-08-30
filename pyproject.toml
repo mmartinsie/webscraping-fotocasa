@@ -8,7 +8,16 @@ target-version = "py39"
 select = ["E", "F", "I", "UP", "B", "SIM", "W"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["chat", "dataset", "metrics", "home", "listing", "predict", "prepare_dataset"]
+known-first-party = [
+    "chat",
+    "dataset",
+    "metrics",
+    "home",
+    "listing",
+    "predict",
+    "prepare_dataset",
+    "pricing",
+]
 
 [tool.ruff.lint.per-file-ignores]
 # Obsolete from-scratch network: kept as-is on purpose.
@@ -18,4 +27,4 @@ known-first-party = ["chat", "dataset", "metrics", "home", "listing", "predict",
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = [".", "webscraping", "keras_neural_network"]
+pythonpath = [".", "webscraping", "keras_neural_network", "webapp"]

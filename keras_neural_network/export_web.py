@@ -16,7 +16,7 @@ import datetime as dt
 import json
 import os
 
-from predict import load_bundle
+from predict import load_bundle, predict_price
 
 
 def export(model_dir: str, output: str) -> None:
@@ -53,6 +53,9 @@ def export(model_dir: str, output: str) -> None:
             "mape": m.get("mape"),
             "generated": dt.date.today().isoformat(),
         },
+        # Regression anchor: the Keras prediction for the all-median flat. The
+        # pure-JS / NumPy forward passes must reproduce it (see tests/test_pricing).
+        "_golden_median_price": round(predict_price(model, scaler, metadata, {}), 2),
     }
 
     os.makedirs(os.path.dirname(os.path.abspath(output)), exist_ok=True)
