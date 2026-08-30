@@ -12,16 +12,19 @@ Run locally:  GEMINI_API_KEY=...  streamlit run webapp/streamlit_app.py
 from __future__ import annotations
 
 import os
+import re
+import time
 
 import google.generativeai as genai
 import streamlit as st
 
 from pricing import load_model, predict_price
 
-# "…-latest" is an alias Google keeps pointing at the current model, so it does
-# not rot when specific versions (gemini-1.5-flash, gemini-2.0-flash, …) retire.
-# Override with a GEMINI_MODEL secret / env var or the sidebar picker.
-DEFAULT_GEMINI_MODEL = "gemini-flash-latest"
+# gemini-*-lite models get the most generous free-tier request quota, which
+# matters here: automatic function calling makes 2-3 API calls per user turn.
+# Pin another with a GEMINI_MODEL secret / env var or the sidebar picker.
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
+MAX_RETRIES = 2
 
 st.set_page_config(page_title="Tasador conversacional", page_icon="🏠")
 MODEL = load_model()
@@ -88,6 +91,37 @@ def build_chat(model_name: str):
     return model.start_chat(enable_automatic_function_calling=True)
 
 
+def _retry_after(exc: Exception) -> float:
+    match = re.search(r"retry in (\d+(?:\.\d+)?)s", str(exc)) or re.search(r"seconds:\s*(\d+)", str(exc))
+    return min(float(match.group(1)) + 1, 30) if match else 10.0
+
+
+def send_message(chat, prompt: str) -> str:
+    """Send a turn, backing off once or twice on a 429 (free-tier rate limit)."""
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            return chat.send_message(prompt).text
+        except Exception as exc:
+            text = str(exc)
+            if "429" in text and attempt < MAX_RETRIES:
+                wait = _retry_after(exc)
+                with st.spinner(f"Límite gratuito alcanzado, reintento en {wait:.0f} s…"):
+                    time.sleep(wait)
+                continue
+            if "404" in text or "not found" in text.lower():
+                models = available_models()
+                hint = ("\n\nModelos disponibles: " + ", ".join(models)) if models else ""
+                return f"Error: {exc}{hint}"
+            if "429" in text:
+                return (
+                    "Se ha agotado la cuota gratuita de Gemini para este minuto. "
+                    "Espera un poco y vuelve a intentarlo, o elige un modelo `-lite` "
+                    "en la barra lateral."
+                )
+            return f"Error al hablar con Gemini: {exc}"
+    return "No se pudo completar la petición."
+
+
 st.title("🏠 Tasador conversacional de pisos")
 st.caption(
     f"Modelo entrenado con datos de Fotocasa · conversación con Gemini · "
@@ -106,6 +140,10 @@ if preferred not in options:
     options = [preferred, *options]
 with st.sidebar:
     model_name = st.selectbox("Modelo Gemini", options, index=options.index(preferred))
+    st.caption(
+        "El tier gratuito limita las peticiones por minuto; si ves un error 429, "
+        "espera unos segundos o elige un modelo `-lite`."
+    )
 
 # (Re)build the chat when the app starts or the model changes.
 if st.session_state.get("model_name") != model_name:
@@ -129,12 +167,5 @@ if prompt := st.chat_input("Cuéntame sobre el piso…"):
         st.write(prompt)
     with st.chat_message("assistant"):
         with st.spinner("Pensando…"):
-            try:
-                answer = chat.send_message(prompt).text
-            except Exception as exc:  # network / quota / API / bad-model errors
-                answer = f"Error al hablar con Gemini: {exc}"
-                if "404" in str(exc) or "not found" in str(exc).lower():
-                    models = available_models()
-                    if models:
-                        answer += "\n\nModelos disponibles: " + ", ".join(models)
+            answer = send_message(chat, prompt)
         st.write(answer)
