@@ -32,3 +32,6 @@ web_model/
 
 # Scratch run logs
 run*.out
+
+# Claude Code local settings
+.claude/
