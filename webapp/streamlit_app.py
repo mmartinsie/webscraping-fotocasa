@@ -39,30 +39,72 @@ RANGE_PCT = 0.15  # +/- band shown around the point estimate
 
 st.set_page_config(page_title="Madrid flat price chat", page_icon="🏠")
 
-# Visual polish. Streamlit's internal class names are unstable, so this sticks
-# to documented [data-testid] hooks and plain element selectors; the accent
-# colour and font come from .streamlit/config.toml.
+# Visual polish. Streamlit's internal class names are unstable, so this leans on
+# documented [data-testid]/[data-baseweb] hooks; the accent colour and font come
+# from .streamlit/config.toml.
 st.markdown(
     """
     <style>
-      [data-testid="stToolbar"], [data-testid="stDecoration"], #MainMenu, footer { display: none; }
-      .block-container { padding-top: 2.4rem; padding-bottom: 3rem; max-width: 780px; }
+      [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"],
+      #MainMenu, footer { display: none; }
+      [data-testid="stHeader"] { background: transparent; }
+      .block-container { padding-top: 1.6rem; padding-bottom: 4rem; max-width: 820px; }
 
-      /* Header band: the app title + tagline sit in their own card. */
-      .app-header { margin-bottom: 1.4rem; padding-bottom: 1.1rem;
-        border-bottom: 1px solid rgba(128,128,128,.18); }
-      .app-header h1 { margin: 0; font-size: 1.55rem; font-weight: 680; letter-spacing: -.015em; }
-      .app-header p { margin: .35rem 0 0; color: #6b7280; font-size: .9rem; }
+      /* Hero */
+      .app-header {
+        background: linear-gradient(135deg, rgba(47,107,255,.13), rgba(106,75,255,.11));
+        border: 1px solid rgba(128,128,128,.16); border-radius: 18px;
+        padding: 1.5rem 1.6rem; margin-bottom: 1.6rem;
+      }
+      .app-header .eyebrow {
+        font-size: .68rem; font-weight: 700; letter-spacing: .1em;
+        text-transform: uppercase; color: #2f6bff;
+      }
+      .app-header h1 { margin: .35rem 0 0; font-size: 1.75rem; font-weight: 720; letter-spacing: -.02em; }
+      .app-header p { margin: .5rem 0 0; color: #6b7280; font-size: .9rem; max-width: 58ch; }
 
-      [data-testid="stMetricValue"] { font-variant-numeric: tabular-nums; }
-      [data-testid="stSidebar"] [data-testid="stMetricValue"] { font-size: 1.05rem; }
+      /* Segmented tabs */
+      .stTabs [data-baseweb="tab-list"] {
+        gap: .25rem; background: rgba(128,128,128,.10);
+        padding: .3rem; border-radius: 12px;
+      }
+      .stTabs [data-baseweb="tab"] { border-radius: 9px; padding: .3rem 1rem; }
+      .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] { display: none; }
+      .stTabs [aria-selected="true"] {
+        background: rgba(47,107,255,.16); font-weight: 600;
+      }
+
+      /* Buttons */
       .stButton > button, .stFormSubmitButton > button {
-        border-radius: 9px; font-weight: 600; transition: transform .06s; }
+        border-radius: 10px; font-weight: 600; transition: transform .06s, border-color .12s;
+      }
+      .stButton > button:hover { border-color: #2f6bff; color: #2f6bff; }
       .stButton > button:active, .stFormSubmitButton > button:active { transform: translateY(1px); }
+
+      /* Cards */
       [data-testid="stChatMessage"] {
-        border: 1px solid rgba(128,128,128,.16); border-radius: 12px; }
-      [data-testid="stForm"] { border-radius: 14px; }
-      .stTabs [data-baseweb="tab-list"] { gap: .25rem; }
+        border: 1px solid rgba(128,128,128,.16); border-radius: 14px; background: rgba(128,128,128,.03);
+      }
+      [data-testid="stMetric"] {
+        background: rgba(128,128,128,.06); border: 1px solid rgba(128,128,128,.14);
+        border-radius: 14px; padding: 1rem 1.15rem;
+      }
+      [data-testid="stMetricValue"] { font-variant-numeric: tabular-nums; }
+      [data-testid="stForm"] { border-radius: 16px; }
+
+      /* Welcome / how-it-works card in the empty chat */
+      .welcome {
+        border: 1px solid rgba(128,128,128,.16); border-radius: 14px;
+        background: rgba(128,128,128,.04); padding: 1.15rem 1.25rem; margin: .4rem 0 .2rem;
+      }
+      .welcome .ico { font-size: 1.4rem; }
+      .welcome b { display: block; margin: .3rem 0 .35rem; font-size: .98rem; }
+      .welcome p { margin: 0; color: #6b7280; font-size: .86rem; line-height: 1.55; }
+
+      /* Sidebar */
+      [data-testid="stSidebar"] { background: rgba(128,128,128,.04); }
+      [data-testid="stSidebar"] [data-testid="stMetric"] { padding: .55rem .7rem; }
+      [data-testid="stSidebar"] [data-testid="stMetricValue"] { font-size: 1rem; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -83,8 +125,10 @@ SYSTEM = (
 
 STR = {
     "English": {
+        "eyebrow": "LLM agent demo · tool use",
         "title": "🏠 Madrid flat price chat",
         "caption": "€/m² by district (~2024) + thesis neural network (~2020) · rough estimate",
+        "welcome_title": "Ask about any Madrid flat",
         "no_key": "Missing `GEMINI_API_KEY` (app secret or environment variable).",
         "model_label": "Gemini model",
         "model_help": "The free tier caps requests per minute; on a 429, wait a few "
@@ -127,8 +171,10 @@ STR = {
         "tool_result": "↩ tool result",
     },
     "Español": {
+        "eyebrow": "Demo de agente LLM · tool use",
         "title": "🏠 Tasador conversacional de pisos",
         "caption": "€/m² por distrito (~2024) + red neuronal del TFM (~2020) · estimación aproximada",
+        "welcome_title": "Pregunta por cualquier piso de Madrid",
         "no_key": "Falta `GEMINI_API_KEY` (secret de la app o variable de entorno).",
         "model_label": "Modelo Gemini",
         "model_help": "El tier gratuito limita las peticiones por minuto; si ves un "
@@ -267,7 +313,8 @@ with st.sidebar:
 t = STR[language]
 
 st.markdown(
-    f'<div class="app-header"><h1>{t["title"]}</h1><p>{t["caption"]}</p></div>',
+    f'<div class="app-header"><span class="eyebrow">{t["eyebrow"]}</span>'
+    f"<h1>{t['title']}</h1><p>{t['caption']}</p></div>",
     unsafe_allow_html=True,
 )
 
@@ -337,6 +384,13 @@ with tab_chat:
     for col, example in zip(cols, t["examples"]):
         if col.button(example, use_container_width=True):
             prompt = example
+
+    if not chat.history and not prompt:
+        st.markdown(
+            f'<div class="welcome"><span class="ico">💬</span>'
+            f"<b>{t['welcome_title']}</b><p>{t['how_body']}</p></div>",
+            unsafe_allow_html=True,
+        )
 
     render_history(chat, t)
 
