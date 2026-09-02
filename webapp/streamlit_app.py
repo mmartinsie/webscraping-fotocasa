@@ -40,13 +40,14 @@ RANGE_PCT = 0.15  # +/- band shown around the point estimate
 st.set_page_config(page_title="Madrid flat price chat", page_icon="🏠")
 
 # Visual polish. Streamlit's internal class names are unstable, so this leans on
-# documented [data-testid]/[data-baseweb] hooks; the accent colour and font come
-# from .streamlit/config.toml.
+# documented [data-testid]/[data-baseweb] hooks. No config.toml theme: that would
+# pin the app to a light base and stop it following the viewer's dark-mode
+# preference. The "#MainMenu" hamburger is kept so viewers can still switch theme.
 st.markdown(
     """
     <style>
       [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"],
-      #MainMenu, footer { display: none; }
+      footer { display: none; }
       [data-testid="stHeader"] { background: transparent; }
       .block-container { padding-top: 1.6rem; padding-bottom: 4rem; max-width: 820px; }
 

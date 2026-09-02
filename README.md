@@ -16,7 +16,7 @@ Madrid"* and since refactored into a small, tested codebase.
 | | What it shows |
 | --- | --- |
 | **[🌐 Static estimator](https://mmartinsie.github.io/webscraping-fotocasa/)** | A single HTML page (EN/ES) that runs the trained network in the browser — no backend, no build. Estimates from the district's €/m² and shows the neural network as a reference. |
-| **[🤖 LLM agent](webapp/README.md)** *(deploy from `webapp/`)* | Gemini + function calling with two tools (`estimate_price`, `compare_districts`). The model picks one, asks for the missing inputs, and every call/result is shown inline; the sidebar tracks turns / tokens / latency. A "Form" tab and a hand-written-loop CLI (`agent_manual.py`) round it out. |
+| **[🤖 LLM agent](https://madrid-flat-price.streamlit.app)** *([how it works](webapp/README.md))* | Gemini + function calling with two tools (`estimate_price`, `compare_districts`). The model picks one, asks for the missing inputs, and every call/result is shown inline; the sidebar tracks turns / tokens / latency. A "Form" tab and a hand-written-loop CLI (`agent_manual.py`) round it out. |
 
 ## What this project demonstrates
 
@@ -100,8 +100,9 @@ make check        # ruff + pytest + compile
 ```
 
 The static page is served straight from `docs/` (GitHub Pages → "Deploy from a
-branch" → `master` `/docs`). The agent deploys from `webapp/` on Streamlit
-Community Cloud — see [`webapp/README.md`](webapp/README.md).
+branch" → `master` `/docs`). The agent runs on Streamlit Community Cloud at
+<https://madrid-flat-price.streamlit.app> (main file `webapp/streamlit_app.py`,
+a `GEMINI_API_KEY` secret) — see [`webapp/README.md`](webapp/README.md).
 
 ## Screenshots
 
